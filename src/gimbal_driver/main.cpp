@@ -62,6 +62,8 @@
 #include "module/BasicTypes.hpp"
 #include "module/IODevice.hpp"
 #include "module/ROSTools.hpp"
+#include "module/DownlinkFrame.hpp"
+#include 
 
 using namespace LangYa;
 
@@ -121,9 +123,9 @@ namespace
     private:
         ROSNode<Name> Node;
         std::atomic_bool DeviceError{ false };
-        IODevice<TypedMessage<sizeof(GimbalData)>, GimbalControlData> Device{};
-        MultiCallback<GimbalControlData> CallbackGenerator;
-        GimbalControlData controlShadow_{};
+        IODevice<TypedMessage<sizeof(GimbalData)>, GimbalControlFrame> Device{};
+        MultiCallback<GimbalControlFrame> CallbackGenerator;
+        GimbalControlFrame controlShadow_{};
         std::uint8_t postureCommand_{0}; // 0=不控制, 1=进攻, 2=防御, 3=移动
         std::uint8_t postureState_{0};   // 0=未知, 1=进攻, 2=防御, 3=移动
         int postureTxRepeatCount_{3};
@@ -471,7 +473,7 @@ namespace
             rawSerialRxPublisher_->publish(msg);
         }
 
-        void PublishRawTxTopic(const GimbalControlData& data) {
+        void PublishRawTxTopic(const GimbalControlFrame& data) {
             if (!rawSerialTxPublisher_ || rawSerialTxPublisher_->get_subscription_count() == 0) {
                 return;
             }
@@ -502,7 +504,7 @@ namespace
             }
         }
 
-        void LogDownlinkRaw(const GimbalControlData& data, const char* reason) {
+        void LogDownlinkRaw(const GimbalControlFrame& data, const char* reason) {
             if (rawSerialLogEnable_ && rawSerialLogDownlink_) {
                 const auto sentry_cmd_raw = std::bit_cast<std::uint32_t>(data.SentryCmd);
                 std::ostringstream extra;
@@ -693,7 +695,7 @@ namespace
             if (stale(kRotateField)) firecode.Rotate = 0;
         }
 
-        void ApplyFireCodeCommand(GimbalControlData& g, const gimbal_driver::msg::FireCode& m) {
+        void ApplyFireCodeCommand(GimbalControlFrame& g, const gimbal_driver::msg::FireCode& m) {
             const auto now = std::chrono::steady_clock::now();
             const bool full_snapshot = (m.field_mask == 0) ||
                 ((m.field_mask & gimbal_driver::msg::FireCode::FIELD_ALL) == gimbal_driver::msg::FireCode::FIELD_ALL);
@@ -728,7 +730,7 @@ namespace
             }
         }
 
-        void ApplySentryCmdCommand(GimbalControlData& g, const gimbal_driver::msg::SentryCmd& m) {
+        void ApplySentryCmdCommand(GimbalControlFrame& g, const gimbal_driver::msg::SentryCmd& m) {
             const bool full_snapshot = (m.field_mask == 0) ||
                 ((m.field_mask & gimbal_driver::msg::SentryCmd::FIELD_ALL) == gimbal_driver::msg::SentryCmd::FIELD_ALL);
 
@@ -780,7 +782,7 @@ namespace
             if (FireCodeRaw(next) == before_raw) {
                 return;
             }
-            CallbackGenerator.Modify([&](GimbalControlData& g) {
+            CallbackGenerator.Modify([&](GimbalControlFrame& g) {
                 g.FireCode = next;
             });
         }
@@ -847,13 +849,13 @@ namespace
 
         void GenSubs()
         {
-            GenSub<ly_control_angles>([](GimbalControlData& g, const gimbal_driver::msg::GimbalAngles& m)
+            GenSub<ly_control_angles>([](GimbalControlFrame& g, const gimbal_driver::msg::GimbalAngles& m)
                                         {
                                             g.GimbalAngles.Yaw = static_cast<float>(m.yaw);
                                             g.GimbalAngles.Pitch = static_cast<float>(m.pitch);  
                                         });
 
-            GenSub<ly_control_firecode>([this](GimbalControlData& g, const gimbal_driver::msg::FireCode& m)
+            GenSub<ly_control_firecode>([this](GimbalControlFrame& g, const gimbal_driver::msg::FireCode& m)
                                         {
                                             ApplyFireCodeCommand(g, m);
                                             if (false && !state_timer.check()) {
@@ -861,7 +863,7 @@ namespace
                                             }
                                         });
 
-            GenSub<ly_control_vel>([this](GimbalControlData& g, const gimbal_driver::msg::ControlVelocity& m)
+            GenSub<ly_control_vel>([this](GimbalControlFrame& g, const gimbal_driver::msg::ControlVelocity& m)
                                    {
                                        if (m.use_raw) {
                                            g.Velocity.X = m.raw_x;
@@ -872,7 +874,7 @@ namespace
                                        g.Velocity.Y = EncodeVelocityRaw(m.y_mps);
                                    });
 
-            GenSub<ly_control_posture>([this](GimbalControlData& g, const gimbal_driver::msg::SentryCmd& m)
+            GenSub<ly_control_posture>([this](GimbalControlFrame& g, const gimbal_driver::msg::SentryCmd& m)
                                        {
                                            const bool has_posture =
                                                m.field_mask == 0 ||
@@ -897,7 +899,7 @@ namespace
                                            ArmPostureTx(cmd);
                                        });
 
-            GenSub<ly_control_sentry_cmd>([this](GimbalControlData& g, const gimbal_driver::msg::SentryCmd& m)
+            GenSub<ly_control_sentry_cmd>([this](GimbalControlFrame& g, const gimbal_driver::msg::SentryCmd& m)
                                           {
                                               ApplySentryCmdCommand(g, m);
                                           });
@@ -1292,7 +1294,7 @@ namespace
 
         void TestVirtualLoopback(){
             TypedMessage<sizeof(GimbalData)> test_msg{};
-            GimbalControlData test_msg2{};
+            GimbalControlFrame test_msg2{};
             test_msg.TypeID = GimbalData::TypeID;
             test_msg.GetDataAs<GimbalData>().GimbalAngles.Yaw = 45.0f;
             test_msg2.GimbalAngles.Yaw = 30.0f;
