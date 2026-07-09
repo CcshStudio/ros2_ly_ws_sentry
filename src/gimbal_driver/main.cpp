@@ -58,12 +58,12 @@
 #include <std_msgs/msg/u_int32.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/u_int16_multi_array.hpp>
+#include <geometry_msgs/msg/point_stamped.hpp>
 
 #include "module/BasicTypes.hpp"
+#include "module/DownlinkFrame.hpp"
 #include "module/IODevice.hpp"
 #include "module/ROSTools.hpp"
-#include "module/DownlinkFrame.hpp"
-#include 
 
 using namespace LangYa;
 
@@ -131,6 +131,18 @@ namespace
         int postureTxRepeatCount_{3};
         std::chrono::milliseconds postureTxInterval_{20};
         std::chrono::milliseconds firecodePartialHold_{100};
+        float sentryCoordX_{0.0f};
+        float sentryCoordY_{0.0f};
+        bool sentryCoordPending_{false};
+        bool sentryCoordValid_{false};
+        std::chrono::steady_clock::time_point sentryCoordNextSendTime_{std::chrono::steady_clock::time_point::min()};
+        std::chrono::milliseconds sentryCoordSendInterval_{100};
+        std::chrono::steady_clock::time_point sentryCoordLastRxTime_{};
+        int sentryCoordFieldWidthX_{2800};
+        int sentryCoordFieldWidthY_{1500};
+        int sentryCoordFreshTimeoutMs_{2000};
+        rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr sub_sentry_position_;
+
         float velocityRawToMps_{0.025f};
         std::uint8_t posturePendingToSend_{0};
         std::uint8_t postureLastSent_{0};
@@ -772,6 +784,25 @@ namespace
             if (has_field(gimbal_driver::msg::SentryCmd::FIELD_CONFIRM_ENERGY_ACTIVATE)) {
                 g.SentryCmd.ConfirmEnergyActivate = m.confirm_energy_activate ? 1 : 0;
             }
+        }
+
+        
+        void MaybeSendSentryCoordinate() {
+            if (!sentryCoordPending_ || !sentryCoordValid_) return;
+            const auto now = std::chrono::steady_clock::now();
+            if (now < sentryCoordNextSendTime_) return;
+            if (sentryCoordLastRxTime_.time_since_epoch().count() != 0 && now - sentryCoordLastRxTime_ > std::chrono::milliseconds(sentryCoordFreshTimeoutMs_)) { sentryCoordValid_ = false; sentryCoordPending_ = false; return; }
+            float xc = sentryCoordX_; float yc = sentryCoordY_;
+            if (xc < 0.0f) xc = 0.0f;
+            if (xc > static_cast<float>(sentryCoordFieldWidthX_)) xc = static_cast<float>(sentryCoordFieldWidthX_);
+            if (yc < 0.0f) yc = 0.0f;
+            if (yc > static_cast<float>(sentryCoordFieldWidthY_)) yc = static_cast<float>(sentryCoordFieldWidthY_);
+            LangYa::SentryCoordinateFrame frame;
+            frame.X_cm = static_cast<std::int16_t>(xc);
+            frame.Y_cm = static_cast<std::int16_t>(yc);
+            frame.CRC8 = CRCChecker::CRC8::calculate_downlink(reinterpret_cast<const std::uint8_t*>(&frame), 16);
+            if (Device.WriteRaw(frame)) { sentryCoordPending_ = false; } else { DeviceError = true; return; }
+            sentryCoordNextSendTime_ = now + sentryCoordSendInterval_;
         }
 
         void MaybeApplyFireCodeStaleFallback() {
@@ -1454,6 +1485,20 @@ namespace
             }
 
             postureTxRepeatCount_ = postureRepeatCount;
+            int sentryCoordSendIntervalMs = static_cast<int>(sentryCoordSendInterval_.count());
+            int sentryCoordFieldWidthX = sentryCoordFieldWidthX_;
+            int sentryCoordFieldWidthY = sentryCoordFieldWidthY_;
+            int sentryCoordFreshTimeoutMs = sentryCoordFreshTimeoutMs_;
+            getParamCompat("io_config/sentry_coord_send_interval_ms", "io_config.sentry_coord_send_interval_ms", sentryCoordSendIntervalMs, sentryCoordSendIntervalMs);
+            getParamCompat("io_config/sentry_coord_field_width_x", "io_config.sentry_coord_field_width_x", sentryCoordFieldWidthX, sentryCoordFieldWidthX);
+            getParamCompat("io_config/sentry_coord_field_width_y", "io_config.sentry_coord_field_width_y", sentryCoordFieldWidthY, sentryCoordFieldWidthY);
+            getParamCompat("io_config/sentry_coord_fresh_timeout_ms", "io_config.sentry_coord_fresh_timeout_ms", sentryCoordFreshTimeoutMs, sentryCoordFreshTimeoutMs);
+            if (sentryCoordSendIntervalMs < 20) { sentryCoordSendIntervalMs = 20; }
+            sentryCoordSendInterval_ = std::chrono::milliseconds(sentryCoordSendIntervalMs);
+            sentryCoordFieldWidthX_ = sentryCoordFieldWidthX;
+            sentryCoordFieldWidthY_ = sentryCoordFieldWidthY;
+            sentryCoordFreshTimeoutMs_ = sentryCoordFreshTimeoutMs;
+
             postureTxInterval_ = std::chrono::milliseconds(postureRepeatIntervalMs);
             firecodePartialHold_ = std::chrono::milliseconds(firecodePartialHoldMs);
             velocityRawToMps_ = static_cast<float>(velocityRawToMps);
@@ -1501,11 +1546,15 @@ namespace
                 if (IsValidPosture(postureCommand_)) {
                     ArmPostureTx(postureCommand_);
                 }
+                
+                sub_sentry_position_ = node->create_subscription<geometry_msgs::msg::PointStamped>("/ly/bt/sentry_position", rclcpp::SensorDataQoS(), [this](const geometry_msgs::msg::PointStamped::SharedPtr msg) { if (!msg) return; const auto now = std::chrono::steady_clock::now(); if (!std::isfinite(msg->point.x) || !std::isfinite(msg->point.y)) return; sentryCoordX_ = static_cast<float>(msg->point.x * 100.0); sentryCoordY_ = static_cast<float>(msg->point.y * 100.0); sentryCoordPending_ = true; sentryCoordValid_ = true; sentryCoordLastRxTime_ = now; });
+
                 std::jthread reading{ [this, useVirtualDevice] { useVirtualDevice ? TestVirtualLoopback() : LoopRead(); } };
                 while (!DeviceError) {
                     rclcpp::spin_some(node);
                     MaybeApplyFireCodeStaleFallback();
                     MaybeSendPostureTx();
+                    MaybeSendSentryCoordinate();
                     rate.sleep();
                 }
             }
