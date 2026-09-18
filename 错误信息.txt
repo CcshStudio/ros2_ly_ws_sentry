@@ -1,0 +1,141 @@
+--- stderr: gimbal_driver
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:240 (list):
+  list index: 1 out of range (-1, 0)
+Call Stack (most recent call first):
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
+
+
+CMake Error at /opt/ros/humble/share/rosidl_generator_c/cmake/rosidl_generator_c_generate_interfaces.cmake:69 (message):
+  Target dependency
+  '/build/gimbal_driver/rosidl_adapter/gimbal_driver/msg/GimbalAngles.idl'
+  does not exist
+Call Stack (most recent call first):
+  /opt/ros/humble/share/ament_cmake_core/cmake/core/ament_execute_extensions.cmake:48 (include)
+  /opt/ros/humble/share/rosidl_cmake/cmake/rosidl_generate_interfaces.cmake:286 (ament_execute_extensions)
+  CMakeLists.txt:87 (rosidl_generate_interfaces)
