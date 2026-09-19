@@ -788,7 +788,23 @@ namespace LangYa {
         read_source("Navi", fusion.Navi);
     }
 
+    void from_json(const json& j, League3v3Setting& setting) {
+        setting.Enable = j.value("Enable", setting.Enable);
+        setting.AssumeCoordination = j.value("AssumeCoordination", setting.AssumeCoordination);
+        setting.RecoveryHp = j.value("RecoveryHp", setting.RecoveryHp);
+        setting.RecoveryExitHp = j.value("RecoveryExitHp", setting.RecoveryExitHp);
+        setting.SelfWeakHp = j.value("SelfWeakHp", setting.SelfWeakHp);
+        setting.TeammateWeakHp = j.value("TeammateWeakHp", setting.TeammateWeakHp);
+        setting.EnemyWeakHp = j.value("EnemyWeakHp", setting.EnemyWeakHp);
+        setting.CenterPatrolHoldSec = j.value("CenterPatrolHoldSec", setting.CenterPatrolHoldSec);
+        setting.CenterPatrolTimeoutSec = j.value("CenterPatrolTimeoutSec", setting.CenterPatrolTimeoutSec);
+        setting.PositionFreshTimeoutMs = j.value("PositionFreshTimeoutMs", setting.PositionFreshTimeoutMs);
+        setting.HealthFreshTimeoutMs = j.value("HealthFreshTimeoutMs", setting.HealthFreshTimeoutMs);
+    }
     void from_json(const json& j, LeagueStrategySetting& ls) {
+        if (j.contains("League3v3")) {
+            j.at("League3v3").get_to(ls.League3v3);
+        }
         ls.EnableRouteCompat = j.value("EnableRouteCompat", ls.EnableRouteCompat);
         ls.UseHealthRecovery = j.value("UseHealthRecovery", ls.UseHealthRecovery);
         ls.HealthRecoveryThreshold = j.value("HealthRecoveryThreshold", ls.HealthRecoveryThreshold);
@@ -1330,13 +1346,15 @@ namespace BehaviorTree {
                 "Task/Buff"
             },
             config.TaskSettings.Buff);
-        ReadOptionalBoolParam(
-            node_,
-            {
-                "Task.Outpost",
-                "Task/Outpost"
-            },
-            config.TaskSettings.Outpost);
+        if (!config.LeagueStrategySettings.League3v3.Enable) {
+            ReadOptionalBoolParam(
+                node_,
+                {
+                    "Task.Outpost",
+                    "Task/Outpost"
+                },
+                config.TaskSettings.Outpost);
+        }
         ReadOptionalBoolParam(
             node_,
             {

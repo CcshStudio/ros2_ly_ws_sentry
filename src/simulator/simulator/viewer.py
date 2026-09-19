@@ -2580,7 +2580,7 @@ class Viewer:
             ("EnemyHP", f"outpost={self.value_text(referee.enemy_outpost_hp)} base={self.value_text(referee.enemy_base_hp)}"),
             ("Ammo/Time", f"ammo={record.ammo} time={record.time_left}"),
             ("Energy", f"can={self.flag(referee.sentry_can_activate_energy)} pulse={self.flag(referee.energy_activate_confirm_pulse)}"),
-            ("GainPoint", f"fortress={self.value_text(referee.event_self_fortress_gain_point_status)} outpost={self.value_text(referee.event_self_outpost_gain_point_status)} base={self.flag(referee.event_self_base_gain_point_status)}"),
+            ("GainPoint", f"center={self.value_text(referee.event_center_gain_point_status)} fortress={self.value_text(referee.event_self_fortress_gain_point_status)} outpost={self.value_text(referee.event_self_outpost_gain_point_status)} base={self.flag(referee.event_self_base_gain_point_status)}"),
             ("TeamBuff", f"atk={self.value_text(referee.team_buff_attack)} def={self.value_text(referee.team_buff_defence)} energy={self.value_text(referee.team_buff_remaining_energy)}"),
             ("RFID raw", f"fresh={self.flag(rfid.fresh)} any={self.flag(rfid.any)} raw={self.value_text(referee.rfid_status)} r2={self.value_text(referee.rfid_status_2)}"),
             ("RFID self", f"base={self.flag(rfid.self_base_gain_point)} supply={self.flag(rfid.self_supply)} high={self.flag(rfid.self_highland_gain_point)} road={self.flag(rfid.self_road_crossing)} tunnel={self.flag(rfid.self_tunnel)}"),

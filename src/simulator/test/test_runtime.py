@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from inspect import getfile
 from pathlib import Path
 
@@ -9,6 +10,86 @@ from simulator.control_bus import append_command
 from simulator.interactive_inputs import load_unit_scene_file
 from simulator.main import make_bootstrap_record
 from simulator.runtime import SimulationRuntime
+
+
+def test_headless_runtime_supply_heals_3v3_sentry_and_syncs_decision_health(tmp_path: Path) -> None:
+    config = copy.deepcopy(load_config(resolve_path("src/simulator/config/league_3v3.yaml")))
+    control_file = tmp_path / "control.jsonl"
+    config["match_control"] = {"enabled": True, "duration_sec": 420, "control_file": control_file.as_posix()}
+    goals = goals_by_id(config)
+    names = {goal_id: str(goal.get("name", "")) for goal_id, goal in goals.items()}
+    record = make_bootstrap_record(config, goals, names)
+    runtime = SimulationRuntime(
+        records=[record],
+        config=config,
+        goals=goals,
+        bad_lines=0,
+        trace_path=Path("/tmp/decision_trace.jsonl"),
+        goal_names=names,
+        follow=True,
+        follow_poll_sec=0.25,
+        follow_offset=0,
+        start_paused=True,
+        speed=None,
+    )
+    runtime.match_running = True
+    runtime.sim_input_state.apply_command(
+        "place_unit",
+        {
+            "entity_id": "friend:sentry:offline",
+            "side": "friend",
+            "unit_key": "sentry",
+            "hp": 100,
+            "x": 75,
+            "y": 700,
+        },
+    )
+
+    runtime.advance_visual_units(1.0)
+    payload = runtime.web_status_metadata()
+    sentry = next(unit for unit in payload["scene"]["units"] if unit["type"] == "Sentry")
+    commands = [json.loads(line) for line in control_file.read_text(encoding="utf-8").splitlines()]
+
+    assert sentry["hp"] == 200
+    assert commands[-1] == {"ts": commands[-1]["ts"], "command": "set_self_health", "hp": 200}
+
+
+def test_headless_runtime_reset_restores_3v3_initial_sentry(tmp_path: Path) -> None:
+    config = copy.deepcopy(load_config(resolve_path("src/simulator/config/league_3v3.yaml")))
+    goals = goals_by_id(config)
+    names = {goal_id: str(goal.get("name", "")) for goal_id, goal in goals.items()}
+    record = make_bootstrap_record(config, goals, names)
+    runtime = SimulationRuntime(
+        records=[record],
+        config=config,
+        goals=goals,
+        bad_lines=0,
+        trace_path=Path("/tmp/decision_trace.jsonl"),
+        goal_names=names,
+        follow=True,
+        follow_poll_sec=0.25,
+        follow_offset=0,
+        start_paused=True,
+        speed=None,
+    )
+    runtime.sim_input_state.apply_command(
+        "place_unit",
+        {
+            "entity_id": "friend:sentry:offline",
+            "side": "friend",
+            "unit_key": "sentry",
+            "hp": 111,
+            "x": 600,
+            "y": 400,
+        },
+    )
+
+    runtime.apply_local_match_command("reset", {})
+    payload = runtime.web_status_metadata()
+    sentry = next(unit for unit in payload["scene"]["units"] if unit["type"] == "Sentry")
+
+    assert sentry["position_cm"] == {"x": 75, "y": 700}
+    assert sentry["hp"] == 400
 
 
 def test_headless_runtime_advances_shared_scene_state_without_pygame(tmp_path: Path) -> None:
@@ -98,4 +179,18 @@ def test_match_clock_rewind_and_forward_only_change_remaining_time(tmp_path: Pat
     assert payload["replay"]["match_time_left"] == 30
     assert payload["replay"]["match_duration_sec"] == 420
     assert payload["replay"]["match_running"] is True
+    assert payload["replay"]["match_started"] is True
+    assert payload["replay"]["match_started_user"] is True
     assert runtime.sim_input_state.snapshot() == original_scene
+
+    runtime.apply_local_match_command("pause", {})
+    paused = runtime.web_status_metadata()["replay"]
+    assert paused["match_running"] is False
+    assert paused["match_started"] is True
+    assert paused["match_started_user"] is True
+
+    runtime.apply_local_match_command("reset", {})
+    reset = runtime.web_status_metadata()["replay"]
+    assert reset["match_running"] is False
+    assert reset["match_started"] is False
+    assert reset["match_started_user"] is False

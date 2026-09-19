@@ -190,6 +190,7 @@ namespace BehaviorTree{
         GenSub<ly_game_event_data>([](Application& app, auto msg) {
             const auto now = std::chrono::steady_clock::now();
             app.extEventData = msg->raw;
+            app.eventCenterGainPointStatus_ = msg->center_gain_point_status;
             app.eventSelfSmallEnergyStatus_ = msg->self_small_energy_status;
             app.eventSelfLargeEnergyStatus_ = msg->self_large_energy_status;
             app.eventSelfFortressGainPointStatus_ = msg->self_fortress_gain_point_status;
@@ -444,6 +445,8 @@ namespace BehaviorTree{
         // ly_position_data
         GenSub<ly_position_data>([stamp_or_now](Application& app, auto msg) {
             const auto stamp = stamp_or_now(app, msg->header);
+            const int official_field_height_cm =
+                app.config.LeagueStrategySettings.League3v3.Enable ? 800 : 1500;
             int FriendCarId = msg->friendcarid;
             auto in_range = [](const int idx) { return idx >= 0 && idx < 10; };
             auto maybe_warn_invalid_id = [&](const char* side, const int raw_id) {
@@ -466,13 +469,13 @@ namespace BehaviorTree{
                 } else if (friend_is_sentry) {
                     app.sentryPositionDataSource_.Valid = true;
                     app.sentryPositionDataSource_.X = static_cast<int>(msg->friendx);
-                    app.sentryPositionDataSource_.Y = 1500 - static_cast<int>(msg->friendy);
+                    app.sentryPositionDataSource_.Y = official_field_height_cm - static_cast<int>(msg->friendy);
                     app.sentryPositionDataSource_.LastRx = now;
                     app.sentryPositionDataSource_.Stamp = stamp;
                     app.UpdateSentryPositionFusion(now);
                 } else {
                     app.friendRobots[FriendCarId].position_.X = msg->friendx;
-                    app.friendRobots[FriendCarId].position_.Y = 1500 - msg->friendy;
+                    app.friendRobots[FriendCarId].position_.Y = official_field_height_cm - msg->friendy;
                     app.lastFriendPositionRxTime_[friend_index] = now;
                     app.lastFriendPositionStamp_[friend_index].Stamp = stamp;
                 }
@@ -484,7 +487,7 @@ namespace BehaviorTree{
             if (in_range(EnemyCarId)) {
                 if (!IsRawPositionZero(msg->enemyx, msg->enemyy)) {
                     app.enemyRobots[EnemyCarId].position_.X = msg->enemyx;
-                    app.enemyRobots[EnemyCarId].position_.Y = 1500 - msg->enemyy;
+                    app.enemyRobots[EnemyCarId].position_.Y = official_field_height_cm - msg->enemyy;
                     const auto enemy_index = static_cast<std::size_t>(EnemyCarId);
                     app.lastEnemyPositionRxTime_[enemy_index] = std::chrono::steady_clock::now();
                     app.lastEnemyPositionStamp_[enemy_index].Stamp = stamp;

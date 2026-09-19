@@ -504,6 +504,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--mock-event-raw", type=int, default=0, help="Mock /ly/game/event_data raw.")
     parser.add_argument(
+        "--mock-event-center-gain-point-status",
+        type=int,
+        default=0,
+        help="Mock event_data center_gain_point_status (0=unoccupied, 1=ours, 2=enemy, 3=contested).",
+    )
+    parser.add_argument(
         "--mock-event-self-small-energy-status",
         type=int,
         default=0,
@@ -784,6 +790,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--live-view",
         action="store_true",
         help="Start the browser Tactical Board while decision is running (follow growing trace file).",
+    )
+    parser.add_argument(
+        "--viewer-config",
+        default="",
+        help="Optional simulator YAML config for the live viewer (for example src/simulator/config/league_3v3.yaml).",
     )
     parser.add_argument(
         "--live-debug-pygame",
@@ -1104,6 +1115,7 @@ def build_mock_command(root: Path, args: argparse.Namespace) -> tuple[list[str],
         ("--team-buff-attack", args.mock_team_buff_attack),
         ("--team-buff-remaining-energy", args.mock_team_buff_remaining_energy),
         ("--event-raw", args.mock_event_raw),
+        ("--event-center-gain-point-status", args.mock_event_center_gain_point_status),
         ("--event-self-small-energy-status", args.mock_event_self_small_energy_status),
         ("--event-self-large-energy-status", args.mock_event_self_large_energy_status),
         (
@@ -1314,6 +1326,7 @@ def build_live_viewer_command(
     *,
     input_owner: str = "mock",
     debug_pygame: bool = False,
+    viewer_config: str = "",
 ) -> list[str]:
     cmd = [
         sys.executable,
@@ -1344,6 +1357,8 @@ def build_live_viewer_command(
         cmd.extend(["--ros-state-file", str(Path(ros_state_file).expanduser().resolve())])
     if str(unit_scene).strip():
         cmd.extend(["--unit-scene", unit_scene])
+    if str(viewer_config).strip():
+        cmd.extend(["--config", str(Path(viewer_config).expanduser().resolve())])
     if debug_pygame:
         cmd.append("--debug-pygame")
     return cmd
@@ -1363,6 +1378,7 @@ def start_live_viewer(
     *,
     input_owner: str = "mock",
     debug_pygame: bool = False,
+    viewer_config: str = "",
 ) -> subprocess.Popen[bytes]:
     cmd = build_live_viewer_command(
         trace_path,
@@ -1377,6 +1393,7 @@ def start_live_viewer(
         unit_scene,
         input_owner=input_owner,
         debug_pygame=debug_pygame,
+        viewer_config=viewer_config,
     )
     return subprocess.Popen(cmd)
 
@@ -1514,6 +1531,7 @@ def main(argv: list[str] | None = None) -> int:
             unit_scene_path.as_posix() if unit_scene_path is not None else "",
             input_owner=args.input_owner,
             debug_pygame=args.live_debug_pygame,
+            viewer_config=args.viewer_config,
         )
         print(f"live viewer command: {' '.join(shlex.quote(item) for item in live_viewer_cmd)}")
 
@@ -1598,6 +1616,7 @@ def main(argv: list[str] | None = None) -> int:
                 unit_scene_path.as_posix() if unit_scene_path is not None else "",
                 input_owner=args.input_owner,
                 debug_pygame=args.live_debug_pygame,
+                viewer_config=args.viewer_config,
             )
             # Give viewer a moment to start and enter follow wait state.
             time.sleep(0.5)

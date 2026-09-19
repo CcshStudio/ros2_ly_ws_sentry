@@ -248,6 +248,15 @@ target_include_directories(sentry_message_node PRIVATE
 )
 
 if(BUILD_TESTING)
+  ament_add_gtest(test_league3v3_policy
+    test/test_league3v3_policy.cpp
+    src/League3v3Policy.cpp
+  )
+  target_include_directories(test_league3v3_policy PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/module>
+  )
+
   ament_add_gtest(test_outpost_engagement_lock
     test/test_outpost_engagement_lock.cpp
     src/OutpostEngagementLock.cpp

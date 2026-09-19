@@ -1,6 +1,6 @@
 {
   "schema": "ly_simulator_scenario_manifest_v1",
-  "updated": "2026-06-02",
+  "updated": "2026-09-19",
   "description": "Named compact fixtures for offline simulator validation and regression checks.",
   "scenarios": [
     {
@@ -386,6 +386,21 @@
         "time_left_sequence": [420, 419, 418, 417],
         "target_state_true": ["has_recent_target", "fresh_auto_aim", "fresh_buff"],
         "warning_codes": ["scenario.route_churn"]
+      }
+    },
+    {
+      "name": "league_3v3_demo",
+      "path": "league_3v3_demo.jsonl",
+      "description": "League 3v3 offline goal-id patrol demo using the official RMUL field map and center tactical points.",
+      "expected": {
+        "status": "PASS",
+        "records": 6,
+        "schema_versions": {"v2": 6},
+        "output_kinds": {"goal_pos": 5, "relative_target_bridge": 1},
+        "goal_names": ["SelfBase", "CenterAnchor", "EnemyStartApproach", "CenterOwnSide", "CenterTop", "CenterEnemySide"],
+        "intent_layers": ["Tactical"],
+        "intent_reasons": ["league_3v3_demo"],
+        "aim_modes": ["AutoAim", "Buff", "Outpost", "RotateScan"]
       }
     }
   ]

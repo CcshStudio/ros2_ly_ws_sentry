@@ -634,6 +634,7 @@ class RefereeState:
     time_left: int
     sentry_can_activate_energy: bool
     energy_activate_confirm_pulse: bool
+    event_center_gain_point_status: int | None
     event_self_fortress_gain_point_status: int | None
     event_self_outpost_gain_point_status: int | None
     event_self_base_gain_point_status: bool | None

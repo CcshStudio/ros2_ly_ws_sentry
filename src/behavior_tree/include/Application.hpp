@@ -60,6 +60,7 @@
 #include "OutpostEngagementLock.hpp"
 #include "StrategyManager.hpp"
 #include "TacticalProtectionPolicy.hpp"
+#include "League3v3Policy.hpp"
 
 using namespace BT;
 using namespace LangYa;
@@ -398,6 +399,7 @@ private:
     std::uint64_t handledMapCommandRxSequence_{0};
     std::uint32_t extEventData{};
     bool hasReceivedEventData_{false};
+    std::uint8_t eventCenterGainPointStatus_{0};
     std::uint8_t eventSelfSmallEnergyStatus_{0};
     std::uint8_t eventSelfLargeEnergyStatus_{0};
     std::uint8_t eventSelfFortressGainPointStatus_{0};
@@ -563,6 +565,9 @@ private:
     std::chrono::steady_clock::time_point leagueRecoveryCooldownUntil_{};
     std::uint16_t leagueRecoveryEntryHealth_{0};
     std::uint16_t leagueRecoveryPeakHealth_{0};
+    League3v3Policy league3v3Policy_{};
+    League3v3Decision league3v3Decision_{};
+    bool league3v3PolicyConfigured_{false};
     std::size_t leaguePatrolGoalIndex_{0};
     bool leaguePatrolGoalInitialized_{false};
     std::size_t showcasePatrolGoalIndex_{0};
@@ -1006,6 +1011,7 @@ public:
     CastleOccupancyResolution ResolveProtectCastleOccupancy(
         std::chrono::steady_clock::time_point now) const;
     bool IsFortressGainPointEnemyOccupiedEventFresh(int referee_fresh_ms) const noexcept;
+    League3v3Input BuildLeague3v3Input(std::chrono::steady_clock::time_point now) const;
     bool IsFriendPositionFresh(UnitType unit_type, int fresh_ms) const;
     bool IsFriendHealthFresh(UnitType unit_type, int fresh_ms) const;
     bool IsEnemyPositionFresh(UnitType unit_type, int fresh_ms) const;

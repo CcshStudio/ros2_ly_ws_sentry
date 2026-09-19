@@ -720,6 +720,7 @@ def normalize_referee(raw: dict[str, Any]) -> RefereeState:
         time_left=integer(referee.get("time_left", raw.get("time_left")), 0),
         sentry_can_activate_energy=boolean(referee.get("sentry_can_activate_energy")),
         energy_activate_confirm_pulse=boolean(referee.get("energy_activate_confirm_pulse")),
+        event_center_gain_point_status=optional_integer(referee.get("event_center_gain_point_status")),
         event_self_fortress_gain_point_status=optional_integer(referee.get("event_self_fortress_gain_point_status")),
         event_self_outpost_gain_point_status=optional_integer(referee.get("event_self_outpost_gain_point_status")),
         event_self_base_gain_point_status=optional_bool(referee.get("event_self_base_gain_point_status")),

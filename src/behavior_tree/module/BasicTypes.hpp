@@ -725,6 +725,19 @@ namespace LangYa
         SentryPositionFusionSourceSetting Navi{true, 1, 0.8, 0};
     };
 
+    struct League3v3Setting {
+        bool Enable{false};
+        bool AssumeCoordination{true};
+        std::uint16_t RecoveryHp{250};
+        std::uint16_t RecoveryExitHp{400};
+        std::uint16_t SelfWeakHp{275};
+        std::uint16_t TeammateWeakHp{150};
+        std::uint16_t EnemyWeakHp{150};
+        int CenterPatrolHoldSec{5};
+        int CenterPatrolTimeoutSec{10};
+        int PositionFreshTimeoutMs{2500};
+        int HealthFreshTimeoutMs{1000};
+    };
     struct LeagueStrategySetting {
         bool EnableRouteCompat{true};
         bool UseHealthRecovery{true};
@@ -738,6 +751,7 @@ namespace LangYa
         int HealthRecoveryExitStableSec{1};
         int HealthRecoveryMaxHoldSec{12};
         int HealthRecoveryCooldownSec{20};
+        League3v3Setting League3v3{};
         std::uint8_t MainGoal{OccupyArea.ID};
         std::vector<std::uint8_t> PatrolGoals{};
         int GoalHoldSec{15};

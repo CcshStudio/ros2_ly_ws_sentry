@@ -5,6 +5,7 @@ import json
 import math
 import sys
 from pathlib import Path
+from typing import Any
 
 from .config import goals_by_id, load_config, load_plugin_points, resolve_path
 from .foxglove_export import export_records_to_mcap
@@ -12,6 +13,43 @@ from .interactive_inputs import load_unit_scene_file
 from .trace import build_changes, load_trace, load_trace_incremental, normalize_record
 from .validation import format_validation, validation_report, validate_records
 from .viewer import Viewer
+
+
+def league_3v3_map_objects(goals: dict[int, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return presentation-only red/blue target markers for the 3v3 field."""
+    labels = {
+        "SelfBase": "己方基地",
+        "CenterAnchor": "中央控制区锚点",
+        "EnemyStartApproach": "敌方基地外围",
+        "CenterOwnSide": "己方控制区前沿",
+        "CenterTop": "控制区上侧巡逻点",
+        "CenterEnemySide": "敌方控制区前沿",
+    }
+    objects: list[dict[str, Any]] = []
+    for goal_id, goal in sorted(goals.items()):
+        name = str(goal.get("name", f"Goal{goal_id}"))
+        label = labels.get(name, name)
+        for field_side in ("red", "blue"):
+            point = goal.get(field_side)
+            if not isinstance(point, (list, tuple)) or len(point) < 2:
+                continue
+            if name == "SelfBase":
+                label = "红方基地" if field_side == "red" else "蓝方基地"
+            elif name == "EnemyStartApproach":
+                label = "逼近蓝方基地" if field_side == "red" else "逼近红方基地"
+            elif name == "CenterOwnSide":
+                label = "红方控制区前沿" if field_side == "red" else "蓝方控制区前沿"
+            elif name == "CenterEnemySide":
+                label = "蓝方控制区前沿" if field_side == "red" else "红方控制区前沿"
+            objects.append({
+                "key": f"{name}:{field_side}",
+                "label": label,
+                "detail": f"{name} · {field_side}",
+                "field_side": field_side,
+                "x": point[0],
+                "y": point[1],
+            })
+    return objects
 
 
 def trace_status_payload(trace_path: Path, records: list, bad_lines: int, follow: bool) -> dict:
@@ -283,6 +321,10 @@ def main(argv: list[str] | None = None) -> int:
 
     trace_path = resolve_path(args.trace or paths.get("sample_trace", "src/simulator/sample/sample_trace.jsonl"))
     map_path = resolve_path(args.map_path or paths.get("default_map", "tools/maps/basemaps/buff_map_field.png"))
+    field_cfg = config.get("field_cm", {}) if isinstance(config.get("field_cm"), dict) else {}
+    field_width_cm = int(field_cfg.get("width_cm", field_cfg.get("width", 0)) or 0)
+    field_height_cm = int(field_cfg.get("height_cm", field_cfg.get("height", 0)) or 0)
+    is_3v3_field = field_width_cm == 1200 and field_height_cm == 800
     if not args.follow and not trace_path.exists():
         print(f"trace file not found: {trace_path}", file=sys.stderr)
         return 2
@@ -295,6 +337,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.points_json:
         goals.update(load_plugin_points(resolve_path(args.points_json)))
     goal_names = {goal_id: str(goal.get("name", f"Goal{goal_id}")) for goal_id, goal in goals.items()}
+    stream_map_objects = league_3v3_map_objects(goals) if is_3v3_field else None
 
     records: list = []
     bad_lines = 0
@@ -313,6 +356,7 @@ def main(argv: list[str] | None = None) -> int:
                 control_file=control_file,
                 default_step_sec=control_step_sec,
                 map_path=map_path.as_posix(),
+                map_objects=stream_map_objects,
             )
             streamer.start()
             if web_host == "0.0.0.0":

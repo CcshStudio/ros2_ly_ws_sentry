@@ -1,0 +1,62 @@
+schema: ly_simulator_config_v1
+updated: "2026-09-19"
+
+paths:
+  default_map: tools/maps/basemaps/RMUL2026_3V3_topdown_field.png
+  sample_trace: sample/sample_trace.jsonl
+
+match_control:
+  enabled: true
+  mode: rmul_3v3_offline
+  duration_sec: 300
+
+field_cm:
+  width: 1200
+  height: 800
+  frame: left_bottom_origin_cm
+
+terrain:
+  enabled: false
+
+structures:
+  enabled: false
+
+simulator_inputs:
+  enabled: true
+  structures: []
+  structure_positions: {}
+  visual_goal_tracking: true
+  visual_unit_speed_cm_s: 80
+  supply_heal_enabled: true
+  supply_heal_rate_ratio: 0.25
+  supply_radius_cm: 180
+  initial_units:
+    - {entity_id: friend:sentry:offline, side: friend, type: Sentry, hp: 400, max_hp: 400, position_cm: {x: 75, y: 700}}
+  unit_palette:
+    - {side: friend, type_id: 1, type: Hero, hp: 350, max_hp: 350}
+    - {side: friend, type_id: 3, type: Infantry1, hp: 300, max_hp: 300}
+    - {side: friend, type_id: 7, type: Sentry, hp: 400, max_hp: 400}
+    - {side: enemy, type_id: 1, type: Hero, hp: 350, max_hp: 350}
+    - {side: enemy, type_id: 3, type: Infantry1, hp: 300, max_hp: 300}
+    - {side: enemy, type_id: 7, type: Sentry, hp: 400, max_hp: 400}
+
+layers:
+  terrain: false
+  structures: false
+  simulator_inputs: true
+  grid: true
+  all_goals: true
+  current_goal: true
+  goal_path: true
+  scripted_path: true
+  units: true
+  unit_health_bars: true
+  recent_changes: true
+
+goals:
+  - {id: 0, name: SelfBase, red: [75, 700], blue: [1125, 100]}
+  - {id: 1, name: CenterAnchor, red: [600, 400], blue: [600, 400]}
+  - {id: 2, name: EnemyStartApproach, red: [1050, 630], blue: [150, 170]}
+  - {id: 3, name: CenterOwnSide, red: [500, 400], blue: [700, 400]}
+  - {id: 4, name: CenterTop, red: [600, 500], blue: [600, 300]}
+  - {id: 5, name: CenterEnemySide, red: [700, 400], blue: [500, 400]}

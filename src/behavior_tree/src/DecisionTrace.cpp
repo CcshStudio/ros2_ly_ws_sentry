@@ -20,6 +20,8 @@ namespace {
 
 constexpr int kTraceFieldWidthCm = 2800;
 constexpr int kTraceFieldHeightCm = 1500;
+constexpr int kLeague3v3TraceFieldWidthCm = 1200;
+constexpr int kLeague3v3TraceFieldHeightCm = 800;
 constexpr float kTraceVelocityRawToMps = 0.025f;
 
 const char* UnitTeamToString(const UnitTeam team) noexcept {
@@ -71,7 +73,10 @@ const char* UnitTypeToString(const UnitType type) noexcept {
     }
 }
 
-const char* GoalName(const int base_goal_id) noexcept {
+const char* GoalName(const int base_goal_id, const bool league_3v3) noexcept {
+    if (league_3v3) {
+        return League3v3GoalName(static_cast<League3v3Goal>(base_goal_id));
+    }
     switch (base_goal_id) {
         case LangYa::Home.ID: return "Home";
         case LangYa::Base.ID: return "Base";
@@ -163,7 +168,7 @@ json RobotToJson(const Robot& robot, const UnitType type, const char* side) {
     };
 }
 
-json RobotsToJson(const Robots& robots, const char* side) {
+json RobotsToJson(const Robots& robots, const char* side, const bool league_3v3) {
     static constexpr std::array<UnitType, 6> kTraceUnits{
         UnitType::Hero,
         UnitType::Engineer,
@@ -172,10 +177,28 @@ json RobotsToJson(const Robots& robots, const char* side) {
         UnitType::Infantry3,
         UnitType::Sentry,
     };
+    static constexpr std::array<UnitType, 3> kLeague3v3Units{
+        UnitType::Hero,
+        UnitType::Infantry1,
+        UnitType::Sentry,
+    };
 
     json out = json::array();
-    for (const auto type : kTraceUnits) {
-        out.push_back(RobotToJson(robots[type], type, side));
+    const auto append_unit = [&](const UnitType type) {
+        const auto& robot = robots[type];
+        if (league_3v3 && robot.position_.X == 0 && robot.position_.Y == 0) {
+            return;
+        }
+        out.push_back(RobotToJson(robot, type, side));
+    };
+    if (league_3v3) {
+        for (const auto type : kLeague3v3Units) {
+            append_unit(type);
+        }
+    } else {
+        for (const auto type : kTraceUnits) {
+            append_unit(type);
+        }
     }
     return out;
 }
@@ -613,9 +636,10 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
     record["elapsed_sec"] = ElapsedSeconds();
     record["wall_time_ms"] = wall_ms;
 
+    const bool league_3v3_trace = config.LeagueStrategySettings.League3v3.Enable;
     record["field_cm"] = {
-        {"width", kTraceFieldWidthCm},
-        {"height", kTraceFieldHeightCm},
+        {"width", league_3v3_trace ? kLeague3v3TraceFieldWidthCm : kTraceFieldWidthCm},
+        {"height", league_3v3_trace ? kLeague3v3TraceFieldHeightCm : kTraceFieldHeightCm},
         {"frame", "left_bottom_origin_cm"},
     };
     record["competition_profile"] = CompetitionProfileToString(competitionProfile_);
@@ -667,6 +691,7 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
         {"goal_reached", eventSnapshot_.GoalReached},
         {"goal_unreachable", eventSnapshot_.GoalUnreachable},
         {"regional_defense_active", eventSnapshot_.RegionalDefenseActive},
+        {"center_gain_point_status", static_cast<int>(eventCenterGainPointStatus_)},
         {"self_fortress_gain_point_status", static_cast<int>(eventSnapshot_.SelfFortressGainPointStatus)},
         {"self_outpost_gain_point_status", static_cast<int>(eventSnapshot_.SelfOutpostGainPointStatus)},
         {"self_base_gain_point_status", eventSnapshot_.SelfBaseGainPointStatus},
@@ -778,8 +803,8 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
         {"timeout", current_goal_reach.Timeout},
     };
     record["units"] = {
-        {"friend", RobotsToJson(friendRobots, "friend")},
-        {"enemy", RobotsToJson(enemyRobots, "enemy")},
+        {"friend", RobotsToJson(friendRobots, "friend", league_3v3_trace)},
+        {"enemy", RobotsToJson(enemyRobots, "enemy", league_3v3_trace)},
     };
     record["unit_info"] = {
         {"friend", UnitInfoToJson(MakeFriendInfoMsg())},
@@ -801,7 +826,7 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
         {"final_goal_pos_topic", final_goal_pos_topic},
         {"goal_id", static_cast<int>(naviCommandGoal)},
         {"goal_base_id", goal_base_id},
-        {"goal_name", GoalName(goal_base_id)},
+        {"goal_name", GoalName(goal_base_id, config.LeagueStrategySettings.League3v3.Enable)},
         {"goal_side", GoalSide(naviCommandGoal)},
         {"speed_level", static_cast<int>(speedLevel)},
         {"goal_pos_cm", {
@@ -823,7 +848,7 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
     record["navi_goal"] = {
         {"id", static_cast<int>(naviCommandGoal)},
         {"base_id", goal_base_id},
-        {"name", GoalName(goal_base_id)},
+        {"name", GoalName(goal_base_id, config.LeagueStrategySettings.League3v3.Enable)},
         {"side", GoalSide(naviCommandGoal)},
         {"publish_allowed", naviGoalPublishAllowed_},
         {"publish_enabled", publishNaviGoal_},
@@ -962,6 +987,7 @@ void Application::WriteDecisionTrace(const std::string_view event) noexcept {
         {"rfid_match", RfidMatchToJson(rfidMatchState)},
         {"ext_event_data", extEventData},
         {"has_event_data", hasReceivedEventData_},
+        {"event_center_gain_point_status", static_cast<int>(eventCenterGainPointStatus_)},
         {"event_self_small_energy_status", static_cast<int>(eventSelfSmallEnergyStatus_)},
         {"event_self_large_energy_status", static_cast<int>(eventSelfLargeEnergyStatus_)},
         {"event_self_fortress_gain_point_status", static_cast<int>(eventSelfFortressGainPointStatus_)},

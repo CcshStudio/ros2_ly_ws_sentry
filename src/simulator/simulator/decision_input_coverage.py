@@ -200,6 +200,7 @@ COVERAGE: tuple[DecisionInputCoverage, ...] = (
         formal_topics=("/ly/game/event_data", "/ly/game/sentry/info"),
         mock_inputs=(
             "--mock-event-raw",
+            "--mock-event-center-gain-point-status",
             "--mock-event-self-small-energy-status",
             "--mock-event-self-large-energy-status",
             "--mock-event-self-fortress-gain-point-status",
@@ -213,6 +214,7 @@ COVERAGE: tuple[DecisionInputCoverage, ...] = (
             "events.buff_can_activate",
             "events.buff_activating",
             "events.buff_activated",
+            "referee.event_center_gain_point_status",
             "referee.event_self_*",
             "referee.sentry_can_activate_energy",
             "referee.energy_activate_confirm_pulse",

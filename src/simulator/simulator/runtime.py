@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from .control_bus import command_name, read_commands
+from .control_bus import append_command, command_name, read_commands
 from .field import FieldGeometry
 from .interactive_inputs import SimulatorInputState
 from .trace import as_dict, build_changes, load_trace_incremental, parse_position
@@ -72,6 +72,22 @@ class SimulationRuntime:
             field=FieldGeometry.from_config(config.get("field_cm")),
         )
         self.active_team = self.sim_input_state.team
+        self.visual_goal_tracking = bool(simulator_inputs.get("visual_goal_tracking", False))
+        self.visual_unit_speed_cm_s = max(
+            0.0,
+            self._float(simulator_inputs.get("visual_unit_speed_cm_s"), 250.0),
+        )
+        self.supply_heal_enabled = bool(simulator_inputs.get("supply_heal_enabled", False))
+        self.supply_heal_rate_ratio = max(
+            0.0,
+            self._float(simulator_inputs.get("supply_heal_rate_ratio"), 0.25),
+        )
+        self.supply_radius_cm = max(
+            0.0,
+            self._float(simulator_inputs.get("supply_radius_cm"), 180.0),
+        )
+        self._last_self_health_command_time = 0.0
+        self._last_self_health_command_hp = -1
 
         self.ros_monitor = as_dict(config.get("ros_monitor"))
         ros_state_file = str(self.ros_monitor.get("state_file", "")).strip()
@@ -94,6 +110,7 @@ class SimulationRuntime:
         self.match_time_left_sec = float(max(0, min(self.match_duration_sec, int(initial_time_left))))
         self.last_trace_time_left = int(round(self.match_time_left_sec))
         self.match_started = False
+        self.match_started_by_user = False
         self.match_running = False
 
     @staticmethod
@@ -126,6 +143,84 @@ class SimulationRuntime:
                 if not self.follow:
                     self.playing = False
             self.current_index = min(len(self.records) - 1, max(0, bisect.bisect_right(self.times, self.current_time) - 1))
+        self.advance_visual_units(dt)
+
+    def _supply_point(self) -> tuple[int, int] | None:
+        for goal in self.config.get("goals", []):
+            if not isinstance(goal, dict) or str(goal.get("name", "")) != "SelfBase":
+                continue
+            point = goal.get(self.active_team)
+            if isinstance(point, (list, tuple)) and len(point) >= 2:
+                try:
+                    return int(point[0]), int(point[1])
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    def _publish_simulated_self_health(self, hp: int) -> None:
+        if self.control_path is None:
+            return
+        now = time.perf_counter()
+        if hp == self._last_self_health_command_hp and now - self._last_self_health_command_time < 0.1:
+            return
+        append_command(self.control_path, "set_self_health", {"hp": hp})
+        self._last_self_health_command_time = now
+        self._last_self_health_command_hp = hp
+
+    def advance_visual_units(self, dt: float) -> None:
+        if not self.visual_goal_tracking or not self.match_running or dt <= 0.0 or not self.records:
+            return
+        goal = record_position(self.records[self.current_index], self.goals)
+        if goal is None:
+            return
+        step = self.visual_unit_speed_cm_s * min(float(dt), 0.25)
+        if step <= 0.0:
+            return
+        targets = [
+            unit
+            for unit in self.sim_input_state.scene.units.values()
+            if unit.side == "friend" and unit.unit_key == "sentry"
+        ]
+        for unit in targets:
+            dx = float(goal[0]) - unit.x
+            dy = float(goal[1]) - unit.y
+            distance = math.hypot(dx, dy)
+            if distance <= step or distance < 1e-6:
+                next_x = int(round(goal[0]))
+                next_y = int(round(goal[1]))
+            else:
+                next_x = int(round(unit.x + dx / distance * step))
+                next_y = int(round(unit.y + dy / distance * step))
+            self.sim_input_state.apply_command(
+                "place_unit",
+                {
+                    "entity_id": unit.entity_id,
+                    "side": unit.side,
+                    "unit_key": unit.unit_key,
+                    "hp": unit.hp,
+                    "x": next_x,
+                    "y": next_y,
+                },
+            )
+            if self.supply_heal_enabled:
+                supply_point = self._supply_point()
+                if supply_point is not None and math.hypot(next_x - supply_point[0], next_y - supply_point[1]) <= self.supply_radius_cm:
+                    archetype = self.sim_input_state.catalog.unit_by_key(unit.unit_key)
+                    max_hp = max(1, int(archetype.max_hp))
+                    healed_hp = min(max_hp, int(round(unit.hp + max_hp * self.supply_heal_rate_ratio * dt)))
+                    if healed_hp > unit.hp:
+                        self.sim_input_state.apply_command(
+                            "place_unit",
+                            {
+                                "entity_id": unit.entity_id,
+                                "side": unit.side,
+                                "unit_key": unit.unit_key,
+                                "hp": healed_hp,
+                                "x": next_x,
+                                "y": next_y,
+                            },
+                        )
+                        self._publish_simulated_self_health(healed_hp)
 
     def run(self, streamer: Any) -> None:
         """Publish state until interrupted; no display server is required."""
@@ -146,6 +241,7 @@ class SimulationRuntime:
             if self.match_time_left_sec <= 0.0:
                 self.match_time_left_sec = float(self.match_duration_sec)
             self.match_started = True
+            self.match_started_by_user = True
             self.match_running = True
             self.playing = True
         elif cmd == "pause":
@@ -154,9 +250,12 @@ class SimulationRuntime:
         elif cmd == "reset":
             self.match_time_left_sec = float(self.match_duration_sec)
             self.match_started = False
+            self.match_started_by_user = False
             self.match_running = False
             self.playing = False
             self.live_goal_history.clear()
+            self.sim_input_state.reset()
+            self.active_team = self.sim_input_state.team
         elif cmd in {"rewind", "forward", "set_time_left"}:
             seconds = self._float(payload.get("seconds"), 0.0)
             if cmd == "rewind":
@@ -267,6 +366,8 @@ class SimulationRuntime:
                 "match_time_left": round(self.match_time_left_sec, 2),
                 "match_duration_sec": self.match_duration_sec,
                 "match_running": self.match_running,
+                "match_started": self.match_started,
+                "match_started_user": self.match_started_by_user,
                 "controls_available": self.controls_available(),
             },
             "current_record": current_record,

@@ -438,6 +438,7 @@ class SimulatorWebStream:
         control_file: str = "",
         default_step_sec: int = 10,
         map_path: str = "",
+        map_objects: list[dict[str, Any]] | None = None,
     ) -> None:
         fps_value = float(fps)
         if not math.isfinite(fps_value) or fps_value <= 0:
@@ -468,6 +469,7 @@ class SimulatorWebStream:
             candidate = Path(map_path).expanduser().resolve()
             if candidate.is_file() and candidate.suffix.lower() in {".png", ".jpg", ".jpeg"}:
                 self.map_path = candidate
+        self.map_objects = map_objects
         self.tactical_assets = TacticalAssetRegistry.load()
 
     def start(self) -> None:
@@ -613,7 +615,7 @@ class SimulatorWebStream:
             def _serve_index(self) -> None:
                 # The browser Tactical Board is the only production UI.  The
                 # optional /frame.jpg endpoint is native-pygame debug output.
-                body = build_tactical_html(outer.port)
+                body = build_tactical_html(outer.port, map_objects=outer.map_objects)
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -643,7 +645,7 @@ class SimulatorWebStream:
                 self._json_response(HTTPStatus.OK, outer.status_snapshot())
 
             def _serve_tactical(self) -> None:
-                body = build_tactical_html(outer.port)
+                body = build_tactical_html(outer.port, map_objects=outer.map_objects)
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")

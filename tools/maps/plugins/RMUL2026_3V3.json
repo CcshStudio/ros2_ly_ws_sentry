@@ -1,0 +1,16 @@
+{
+  "map_name": "RMUL_2026_3V3",
+  "frame": "left_bottom_origin_cm",
+  "map_size_cm": {
+    "width": 1200,
+    "height": 800
+  },
+  "points": [
+    {"id": 0, "name": "SelfBase", "red": [75, 700], "blue": [1125, 100]},
+    {"id": 1, "name": "CenterAnchor", "red": [600, 400], "blue": [600, 400]},
+    {"id": 2, "name": "EnemyStartApproach", "red": [1050, 630], "blue": [150, 170]},
+    {"id": 3, "name": "CenterOwnSide", "red": [500, 400], "blue": [700, 400]},
+    {"id": 4, "name": "CenterTop", "red": [600, 500], "blue": [600, 300]},
+    {"id": 5, "name": "CenterEnemySide", "red": [700, 400], "blue": [500, 400]}
+  ]
+}

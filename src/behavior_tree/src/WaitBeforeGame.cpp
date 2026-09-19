@@ -86,6 +86,24 @@ namespace BehaviorTree {
         bool damage_health_baseline_initialized = false;
         std::uint16_t damage_health_peak = 0;
 
+        const auto set_start_hold_position = [&]() {
+            if (config.LeagueStrategySettings.League3v3.Enable) {
+                const auto goal = League3v3Goal::SelfBase;
+                naviCommandGoal = ResolveGoalId(static_cast<std::uint8_t>(goal), team, true);
+                const auto point = League3v3GoalPoint(goal, team);
+                naviGoalPosition = Area::Point<std::uint16_t>{point.X, point.Y};
+                naviGoalPublishAllowed_ = true;
+                RecordDecisionIntent(MakeDecisionIntent(
+                    DecisionReason::League3v3,
+                    static_cast<std::uint8_t>(goal),
+                    team,
+                    true,
+                    "prestart_hold_start"));
+                return;
+            }
+            SET_POSITION(Home, team);
+        };
+
         if (damage_open_gate_enabled) {
             LoggerPtr->Info(
                 "Damage start gate enabled: open by health drop >= {}.",
@@ -106,7 +124,7 @@ namespace BehaviorTree {
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
             const auto now_steady = std::chrono::steady_clock::now();
 
-            SET_POSITION(Home, team);
+            set_start_hold_position();
 
             if(publishNaviGoal_ && naviCommandRateClock.trigger()) {
                 naviCommandRateClock.tick();

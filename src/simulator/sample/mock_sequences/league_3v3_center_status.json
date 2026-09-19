@@ -1,0 +1,35 @@
+{
+  "schema": "ly_simulator_mock_sequence_v1",
+  "description": "League 3v3 center status rehearsal: ours, enemy, contested, ours, unoccupied.",
+  "actions": [
+    {
+      "at_sec": 0,
+      "command": "start"
+    },
+    {
+      "at_sec": 0,
+      "command": "set_event_center_gain_point_status",
+      "status": 1
+    },
+    {
+      "at_sec": 8,
+      "command": "set_event_center_gain_point_status",
+      "status": 2
+    },
+    {
+      "at_sec": 16,
+      "command": "set_event_center_gain_point_status",
+      "status": 3
+    },
+    {
+      "at_sec": 24,
+      "command": "set_event_center_gain_point_status",
+      "status": 1
+    },
+    {
+      "at_sec": 32,
+      "command": "set_event_center_gain_point_status",
+      "status": 0
+    }
+  ]
+}

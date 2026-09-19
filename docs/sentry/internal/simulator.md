@@ -1,6 +1,6 @@
 # Simulator Trace And Viewer
 
-Updated: 2026-07-30
+Updated: 2026-09-19
 
 ## Purpose
 
@@ -304,6 +304,9 @@ Bundled sequence examples:
 - `low_resource_recovery_exit.json`: starts near base with low self HP/ammo, then restores HP/ammo, moves self position forward, and keeps an enemy Hero context to rehearse leaving recovery state.
 - `official_target_fallback_companion.json`: companion script for `--mock-preset official-target-sentry`; opens the gate and changes nearby unit/self facts while the preset publishes `/ly/navi/target_official`.
 - `multi_unit_target_priority_rehearsal.json`: multi-unit HP/position/resource rehearsal for watching target-priority behavior under changing enemy context.
+- `league_3v3_center_status.json`: drives the RMUL 3V3 center status through ours, enemy, contested, ours, and unoccupied so the `LeagueSimple` policy can be replayed without a live referee link.
+
+League 3V3 rehearsal uses `src/simulator/config/league_3v3.yaml`, `tools/maps/basemaps/RMUL2026_3V3_topdown_field.png`, and `scripts/simulator/league_3v3_demo.sh`. In 3V3 mode the JSON `Task.Outpost=false` is preserved against the regional `Task.yaml` default so the league policy is not preempted; the launcher also disables the runtime start gate so the center policy is exercised immediately.
 
 Sequence `at_sec` values are monotonic scheduler elapsed seconds, not referee match time. Use `set_time_left` actions when a test needs an explicit match-clock transition.
 
@@ -857,7 +860,7 @@ Each line is one JSON object. Important top-level fields:
 - `navi_relative_target`: chase/bridge relative target, including frame ID, x/y/z, distance, yaw/pitch error, armor type, aim mode, and official target metadata
 - `face_mode`: `FaceModeManager` 的本拍统一仲裁结果，包括 request 来源、是否接管、是否被视觉得分优先/导航兼容抑制、是否 fallback patrol，以及最终候选 yaw/pitch
 - `posture`: command, state, runtime desired/current/pending, reason
-- `referee`: HP, ammo, time, outpost/base HP, RFID/RFID2 raw state, `rfid_match`, event-data energy/fortress gain-point state, and buff state
+- `referee`: HP, ammo, time, outpost/base HP, RFID/RFID2 raw state, `rfid_match`, event-data center/energy/fortress gain-point state, and buff state
 - `unit_info`: optional formal FriendInfo/EnemyInfo-like unit records used by the viewer and validation when present
 - `gimbal.fire_code.follow_mode`: semantic firecode bit4; old `hole_mode` naming should no longer be used in new traces/docs
 - `gimbal_feedback`: callback-time `/ly/gimbal/firecode` feedback snapshot. `available` and `age_ms` distinguish no received frame from a real all-zero frame. Its nested fire-code fields are intentionally separate from legacy `gimbal.fire_code`, which remains a compatibility snapshot of mutable BT state.

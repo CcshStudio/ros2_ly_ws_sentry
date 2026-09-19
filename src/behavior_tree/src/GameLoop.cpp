@@ -5594,9 +5594,126 @@ namespace BehaviorTree {
         (void)TrySetDefaultRegionalGoal(my_team, enemy_team);
     }
 
+    League3v3Input Application::BuildLeague3v3Input(
+        const std::chrono::steady_clock::time_point now) const {
+        const auto& setting = config.LeagueStrategySettings.League3v3;
+        const int position_fresh_ms = std::max(1, setting.PositionFreshTimeoutMs);
+        const int health_fresh_ms = std::max(1, setting.HealthFreshTimeoutMs);
+
+        const auto age_within = [&](const std::chrono::steady_clock::time_point& last_rx,
+                                    const int timeout_ms) {
+            return last_rx.time_since_epoch().count() != 0 &&
+                now - last_rx <= std::chrono::milliseconds(timeout_ms);
+        };
+        const auto external_visible = [&](const ArmorType type) {
+            const auto index = static_cast<std::size_t>(type);
+            if (index >= externalAimTargets_.size()) {
+                return false;
+            }
+            const auto& cache = externalAimTargets_[index];
+            return cache.Valid &&
+                cache.LastSeen.time_since_epoch().count() != 0 &&
+                now - cache.LastSeen <= std::chrono::milliseconds(health_fresh_ms);
+        };
+        const auto friend_snapshot = [&](const UnitType type) {
+            const auto index = static_cast<std::size_t>(type);
+            League3v3UnitSnapshot snapshot;
+            snapshot.HpFresh = IsFriendHealthFresh(type, health_fresh_ms);
+            snapshot.Hp = friendRobots[type].currentHealth_;
+            snapshot.PositionFresh = IsFriendPositionFresh(type, position_fresh_ms);
+            snapshot.Visible = false;
+            return snapshot;
+        };
+        const auto enemy_snapshot = [&](const UnitType type, const ArmorType armor) {
+            const auto index = static_cast<std::size_t>(type);
+            League3v3UnitSnapshot snapshot;
+            snapshot.HpFresh =
+                index < lastEnemyHealthRxTime_.size() &&
+                age_within(lastEnemyHealthRxTime_[index], health_fresh_ms);
+            snapshot.Hp = enemyHealthConfirmedDead_[index]
+                ? 0U
+                : static_cast<std::uint16_t>(enemyRobots[type].currentHealth_);
+            snapshot.PositionFresh = IsEnemyPositionFresh(type, position_fresh_ms);
+            snapshot.Visible = external_visible(armor);
+            return snapshot;
+        };
+
+        League3v3Input input;
+        input.GameRunning = true;
+        input.SelfHpFresh =
+            hasReceivedMyselfHealth_ &&
+            age_within(lastMyselfHealthRxTime, health_fresh_ms);
+        input.SelfHp = static_cast<std::uint16_t>(std::max(0, static_cast<int>(myselfHealth)));
+        input.EventDataFresh =
+            hasReceivedEventData_ &&
+            age_within(lastEventDataRxTime_, health_fresh_ms);
+        input.CenterStatus = static_cast<League3v3CenterStatus>(
+            std::clamp(static_cast<int>(eventCenterGainPointStatus_), 0, 3));
+        input.Friend.Hero = friend_snapshot(UnitType::Hero);
+        input.Friend.Sentry = friend_snapshot(UnitType::Sentry);
+        input.Friend.Infantry = friend_snapshot(UnitType::Infantry1);
+        input.Enemy.Hero = enemy_snapshot(UnitType::Hero, ArmorType::Hero);
+        input.Enemy.Sentry = enemy_snapshot(UnitType::Sentry, ArmorType::Sentry);
+        input.Enemy.Infantry = enemy_snapshot(UnitType::Infantry1, ArmorType::Infantry1);
+        input.NowMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()).count();
+
+        const std::array<std::pair<UnitType, bool>, 3> enemy_units{{
+            {UnitType::Hero, input.Enemy.Hero.PositionFresh},
+            {UnitType::Sentry, input.Enemy.Sentry.PositionFresh},
+            {UnitType::Infantry1, input.Enemy.Infantry.PositionFresh}}};
+        for (const auto& [unit, fresh] : enemy_units) {
+            if (!fresh) {
+                continue;
+            }
+            if (IsLeague3v3ControlAreaPoint(
+                    static_cast<int>(enemyRobots[unit].position_.X),
+                    static_cast<int>(enemyRobots[unit].position_.Y))) {
+                input.EnemyNearCenter = true;
+                break;
+            }
+        }
+        return input;
+    }
     void Application::SetPositionLeagueSimple() {
         const auto& league = config.LeagueStrategySettings;
         const int hold_sec = std::max(1, league.GoalHoldSec);
+
+        if (league.League3v3.Enable) {
+            if (!league3v3PolicyConfigured_) {
+                league3v3Policy_ = League3v3Policy(league.League3v3);
+                league3v3PolicyConfigured_ = true;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            league3v3Decision_ = league3v3Policy_.Decide(BuildLeague3v3Input(now));
+            const auto league3v3_base_goal = league3v3Decision_.Goal == League3v3Goal::None
+                ? static_cast<std::uint8_t>(League3v3Goal::SelfBase)
+                : static_cast<std::uint8_t>(league3v3Decision_.Goal);
+            const std::string league3v3_detail =
+                std::string("state=") + League3v3StateName(league3v3Decision_.State) +
+                " reason=" + league3v3Decision_.Reason +
+                " target=" + League3v3TargetName(league3v3Decision_.Target);
+            RecordDecisionIntent(MakeDecisionIntent(
+                DecisionReason::League3v3,
+                league3v3_base_goal,
+                team,
+                true,
+                league3v3_detail.c_str()));
+            if (league3v3Decision_.Goal == League3v3Goal::None) {
+                naviGoalPublishAllowed_ = false;
+                speedLevel = 1;
+                return;
+            }
+            naviCommandGoal = ResolveGoalId(
+                static_cast<std::uint8_t>(league3v3Decision_.Goal),
+                team,
+                true);
+            const auto league_goal = League3v3GoalPoint(league3v3Decision_.Goal, team);
+            naviGoalPosition = Area::Point<std::uint16_t>{league_goal.X, league_goal.Y};
+            naviGoalPublishAllowed_ = true;
+            speedLevel = 1;
+            return;
+        }
         constexpr bool apply_team_offset = true;
         if (IsLeagueRouteCompatEnabled() && leagueRouteCompatAfterGatePending_) {
             leagueRouteCompatAfterGatePending_ = false;
@@ -5904,6 +6021,11 @@ namespace BehaviorTree {
     }
 
     bool Application::CheckPositionRecovery() {
+        if (config.LeagueStrategySettings.League3v3.Enable) {
+            // League 3v3 recovery is owned by League3v3Policy so its goal IDs
+            // cannot collide with the legacy regional Recovery goal.
+            return false;
+        }
         if (config.RegionalAreaTaskSettings.IgnoreRecovery) {
             return false;
         }

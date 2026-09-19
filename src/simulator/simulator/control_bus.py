@@ -21,6 +21,7 @@ SIMULATOR_INPUT_COMMANDS = {
     "set_ammo",
     "set_posture",
     "set_self_position",
+    "set_event_center_gain_point_status",
     "set_structure_health",
     "set_structure_hp",
     "set_unit",

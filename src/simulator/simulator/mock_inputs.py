@@ -152,6 +152,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--team-buff-vulnerability", type=int, default=0)
     parser.add_argument("--team-buff-attack", type=int, default=0)
     parser.add_argument("--team-buff-remaining-energy", type=int, default=0)
+    parser.add_argument("--event-center-gain-point-status", type=int, default=0)
     parser.add_argument("--event-self-small-energy-status", type=int, default=0)
     parser.add_argument("--event-self-large-energy-status", type=int, default=0)
     parser.add_argument("--event-self-fortress-gain-point-status", type=int, default=0)
@@ -305,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
                 int(args.uwb_position_y),
             )
             self.posture = max(0, min(255, int(args.posture)))
+            self.event_center_gain_point_status = min(3, clamp_u8(args.event_center_gain_point_status))
             self.sim_input_state.apply_command("set_self_health", {"hp": self.self_health})
             self.sim_input_state.apply_command("set_ammo", {"ammo": self.ammo_left})
             self.sim_input_state.apply_command("set_posture", {"posture": self.posture})
@@ -426,6 +428,18 @@ def main(argv: list[str] | None = None) -> int:
                 self._clamp_time_left()
                 self.match_started = False
                 self.match_running = False
+                self.sim_input_state.reset()
+                sentry = next(
+                    (
+                        unit
+                        for unit in self.sim_input_state.scene.units.values()
+                        if unit.side == "friend" and unit.unit_key == "sentry"
+                    ),
+                    None,
+                )
+                if sentry is not None:
+                    self.self_health = int(sentry.hp)
+                    self.self_position_x, self.self_position_y = sentry.x, sentry.y
                 return
             if command == "rewind":
                 try:
@@ -465,6 +479,12 @@ def main(argv: list[str] | None = None) -> int:
                 self.team_red = team == "red"
                 self.sim_input_state.apply_command("set_team", {"team": team})
                 return
+            if command == "set_event_center_gain_point_status":
+                self.event_center_gain_point_status = min(
+                    3,
+                    clamp_u8(payload.get("status", payload.get("value", self.event_center_gain_point_status))),
+                )
+                return
             if command == "set_self_health":
                 hp = clamp_u16(payload.get("hp", payload.get("health", payload.get("self_health", self.self_health))))
                 self.self_health = hp
@@ -497,6 +517,38 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return
             self.sim_input_state.apply_control_payload(payload)
+            self._sync_self_health_from_payload(payload)
+            self._sync_self_health_from_scene()
+
+        def _sync_self_health_from_payload(self, payload: dict) -> None:
+            entity_id = str(payload.get("entity_id", "")).strip().lower()
+            side = str(payload.get("side", "")).strip().lower()
+            unit_key = str(payload.get("unit_key", "")).strip().lower()
+            type_name = str(payload.get("type", "")).strip().lower()
+            target_is_friend = side in {"friend", "self", "ally"} or entity_id.startswith(("friend:", "self:", "ally:"))
+            target_is_sentry = (
+                "sentry" in entity_id
+                or unit_key == "sentry"
+                or type_name == "sentry"
+                or int(payload.get("type_id", 0) or 0) == 7
+            )
+            if not (target_is_friend and target_is_sentry):
+                return
+            hp = payload.get("hp", payload.get("health"))
+            if hp is not None:
+                self.self_health = clamp_u16(hp)
+
+        def _sync_self_health_from_scene(self) -> None:
+            sentry = next(
+                (
+                    unit
+                    for unit in self.sim_input_state.scene.units.values()
+                    if unit.side == "friend" and unit.unit_key == "sentry"
+                ),
+                None,
+            )
+            if sentry is not None:
+                self.self_health = clamp_u16(sentry.hp)
 
         def _poll_commands(self) -> None:
             if self.control_path is None:
@@ -728,6 +780,7 @@ def main(argv: list[str] | None = None) -> int:
             msg = EventData()
             msg.header.stamp = stamp
             msg.raw = clamp_u32(args.event_raw)
+            msg.center_gain_point_status = self.event_center_gain_point_status
             msg.self_small_energy_status = self._clamp_u8(args.event_self_small_energy_status)
             msg.self_large_energy_status = self._clamp_u8(args.event_self_large_energy_status)
             msg.self_fortress_gain_point_status = self._clamp_u8(args.event_self_fortress_gain_point_status)

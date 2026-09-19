@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -402,6 +403,37 @@ def _unit_palette(catalog: SceneCatalog) -> list[UnitSpec]:
     ]
 
 
+def _unit_palette_from_config(items: Any, catalog: SceneCatalog) -> list[UnitSpec]:
+    if not isinstance(items, list):
+        return []
+    palette: list[UnitSpec] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        side = normalize_side(item.get("side"))
+        type_id = unit_type_id(item, catalog)
+        if side is None or type_id is None:
+            continue
+        archetype = _unit_for_type_id(type_id, catalog, side)
+        if archetype is None:
+            continue
+        try:
+            hp = int(item.get("hp", archetype.default_hp))
+            max_hp = int(item.get("max_hp", archetype.max_hp))
+        except (TypeError, ValueError):
+            continue
+        palette.append(
+            UnitSpec(
+                side=side,
+                type_id=type_id,
+                type_name=str(item.get("type", archetype.label)),
+                hp=hp,
+                max_hp=max_hp,
+            )
+        )
+    return palette
+
+
 class SimulatorInputState:
     """Compatibility facade over :class:`SceneState` for existing simulator clients."""
 
@@ -434,6 +466,9 @@ class SimulatorInputState:
         self._ammo_left = 200
         self._posture = 1
         self._self_position_cm: PointCm | None = None
+        self._initial_units: Any = None
+        self._initial_team = self.scene.team
+        self._initial_structure_health = dict(self.scene.structure_health)
         for (side, structure), hp in (structure_health_overrides or {}).items():
             self.scene.apply(SceneCommand.set_structure_hp(f"{side}:{structure}", int(hp)))
 
@@ -451,7 +486,12 @@ class SimulatorInputState:
             team=str(config.get("team", "red")),
             ownership_mode=str(config.get("input_owner", "mock")),
         )
+        if "structures" in config and not config.get("structures"):
+            state.structures = []
+        if "unit_palette" in config:
+            state.unit_palette = _unit_palette_from_config(config.get("unit_palette"), state.catalog)
         if "initial_units" in config:
+            state._initial_units = deepcopy(config.get("initial_units"))
             state.apply_unit_scene(config.get("initial_units"), clear=True)
         return state
 
@@ -565,6 +605,22 @@ class SimulatorInputState:
             team = str(body.get("team", "")).strip().lower()
             if team not in {"red", "blue"}:
                 return False
+            if team != self.scene.team:
+                for unit in list(self.scene.units.values()):
+                    mirrored = SceneCommand.place_unit(
+                        unit.entity_id,
+                        unit.side,
+                        unit.unit_key,
+                        self.field.width - unit.x,
+                        self.field.height - unit.y,
+                        unit.hp,
+                    )
+                    self.scene.apply(mirrored)
+                if self._self_position_cm is not None:
+                    self._self_position_cm = (
+                        self.field.width - self._self_position_cm[0],
+                        self.field.height - self._self_position_cm[1],
+                    )
             self.scene.team = team
             return True
         if name == "set_self_health":
@@ -605,6 +661,26 @@ class SimulatorInputState:
             "unsupported_scene_command",
             "entity_not_found",
         }
+
+    def reset(self) -> None:
+        current_team = self.scene.team
+        self.scene.team = self._initial_team
+        if self._initial_units is not None:
+            self.apply_unit_scene(deepcopy(self._initial_units), clear=True)
+        else:
+            self.apply_command("clear_units", {})
+        self.scene.structure_health = dict(self._initial_structure_health)
+        if current_team != self._initial_team:
+            self.apply_command("set_team", {"team": current_team})
+        sentry = next(
+            (
+                unit
+                for unit in self.scene.units.values()
+                if unit.side == "friend" and unit.unit_key == "sentry"
+            ),
+            None,
+        )
+        self._self_position_cm = None if sentry is None else (sentry.x, sentry.y)
 
     def apply_unit_scene(self, scene: Any, clear: bool = True) -> int:
         items = unit_scene_items(scene, catalog=self.catalog)

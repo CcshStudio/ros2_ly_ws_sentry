@@ -21,6 +21,7 @@ def test_bundled_mock_sequences_are_valid_and_non_empty() -> None:
         "low_resource_recovery_exit.json",
         "official_target_fallback_companion.json",
         "multi_unit_target_priority_rehearsal.json",
+        "league_3v3_center_status.json",
     }
     for sequence_path in sequence_paths:
         sequence = load_mock_sequence_file(sequence_path)
@@ -38,6 +39,7 @@ def test_bundled_mock_sequence_catalog_includes_metadata() -> None:
         "low_resource_recovery_exit.json",
         "official_target_fallback_companion.json",
         "multi_unit_target_priority_rehearsal.json",
+        "league_3v3_center_status.json",
     }
     assert by_name["regional_timed_context.json"].action_count == 14
     assert "time-varying unit" in by_name["regional_timed_context.json"].description
@@ -49,6 +51,8 @@ def test_bundled_mock_sequence_catalog_includes_metadata() -> None:
     assert "official-target-sentry" in by_name["official_target_fallback_companion.json"].description
     assert by_name["multi_unit_target_priority_rehearsal.json"].action_count == 13
     assert "target-priority" in by_name["multi_unit_target_priority_rehearsal.json"].description
+    assert by_name["league_3v3_center_status.json"].action_count == 6
+    assert "3v3 center status" in by_name["league_3v3_center_status.json"].description
 
 
 def test_list_samples_cli_prints_catalog(capsys) -> None:
@@ -61,6 +65,7 @@ def test_list_samples_cli_prints_catalog(capsys) -> None:
     assert "low_resource_recovery_exit.json: 12 actions" in output
     assert "official_target_fallback_companion.json: 8 actions" in output
     assert "multi_unit_target_priority_rehearsal.json: 13 actions" in output
+    assert "league_3v3_center_status.json: 6 actions" in output
     assert "description:" in output
 
 

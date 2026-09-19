@@ -118,7 +118,20 @@
         "HealthRecoveryCooldownSec": 20,
         "MainGoal": 3,
         "PatrolGoals": [],
-        "GoalHoldSec": 15
+        "GoalHoldSec": 15,
+        "League3v3": {
+            "Enable": true,
+            "AssumeCoordination": true,
+            "RecoveryHp": 250,
+            "RecoveryExitHp": 400,
+            "SelfWeakHp": 275,
+            "TeammateWeakHp": 150,
+            "EnemyWeakHp": 150,
+            "CenterPatrolHoldSec": 5,
+            "CenterPatrolTimeoutSec": 10,
+            "PositionFreshTimeoutMs": 2500,
+            "HealthFreshTimeoutMs": 1000
+        }
     },
     "Posture": {
         "Enable": true

@@ -9,6 +9,7 @@ from typing import Any
 
 import pytest
 
+from simulator.main import league_3v3_map_objects
 from simulator.tactical_web import build_tactical_html, tactical_state_from_status
 from simulator.web_visual_check import find_sync_playwright
 from simulator.web_stream import SimulatorWebStream
@@ -101,6 +102,11 @@ def tactical_metadata(*, ownership_mode: str = "mock", team: str = "red") -> dic
     }
 
 
+def ensure_open(card: Any) -> None:
+    if not card.evaluate("element => element.open"):
+        card.locator("summary").click()
+
+
 def get_json(stream: SimulatorWebStream, path: str) -> tuple[int, dict[str, Any]]:
     url = f"http://127.0.0.1:{stream.port}{path}"
     try:
@@ -131,9 +137,16 @@ def post_json(stream: SimulatorWebStream, path: str, payload: dict[str, Any]) ->
         return exc.code, json.loads(exc.read().decode("utf-8"))
 
 
-def started_stream(tmp_path: Path) -> tuple[SimulatorWebStream, Path]:
+def started_stream(
+    tmp_path: Path, map_objects: list[dict[str, Any]] | None = None
+) -> tuple[SimulatorWebStream, Path]:
     control_file = tmp_path / "tactical-control.jsonl"
-    stream = SimulatorWebStream(host="127.0.0.1", port=0, control_file=control_file.as_posix())
+    stream = SimulatorWebStream(
+        host="127.0.0.1",
+        port=0,
+        control_file=control_file.as_posix(),
+        map_objects=map_objects,
+    )
     stream.start()
     return stream, control_file
 
@@ -160,10 +173,55 @@ def test_tactical_state_keeps_the_configured_team_color() -> None:
     assert state["scene"]["team"] == "blue"
 
 
+def test_tactical_state_exposes_match_started() -> None:
+    metadata = tactical_metadata()
+    metadata["replay"].update({"match_started": True, "match_started_user": True})
+
+    assert tactical_state_from_status(metadata)["match"]["started"] is True
+
+    metadata["replay"].update({"match_started": True, "match_started_user": False})
+    assert tactical_state_from_status(metadata)["match"]["started"] is False
+
+
+def test_league_3v3_map_objects_include_red_and_blue_targets() -> None:
+    goals = {
+        0: {"name": "SelfBase", "red": [75, 700], "blue": [1125, 100]},
+        1: {"name": "CenterAnchor", "red": [600, 400], "blue": [600, 400]},
+    }
+
+    objects = league_3v3_map_objects(goals)
+
+    assert len(objects) == 4
+    assert {item["field_side"] for item in objects} == {"red", "blue"}
+    assert {item["key"] for item in objects} == {
+        "SelfBase:red",
+        "SelfBase:blue",
+        "CenterAnchor:red",
+        "CenterAnchor:blue",
+    }
+
+
+def test_tactical_html_exposes_local_health_draft_controls() -> None:
+    body = build_tactical_html(0).decode("utf-8")
+
+    assert "card('当前血量'" in body
+    assert "card('血量设置'" in body
+    assert "data-hp-step" in body
+    assert "data-payload" not in body
+
+
 def test_tactical_html_exposes_a_persistent_team_badge() -> None:
     body = build_tactical_html(0).decode("utf-8")
 
     assert 'id="teamPill"' in body
+
+
+def test_tactical_html_accepts_explicit_empty_map_objects() -> None:
+    body = build_tactical_html(0, map_objects=[]).decode("utf-8")
+
+    assert "const MAP_OBJECTS=[]" in body
+    assert "state.match.started" in body
+    assert "const show=!started&&item.field_side===activeTeam" in body
 
 
 def test_team_switch_buttons_emit_a_validated_team_command(tmp_path: Path) -> None:
@@ -181,7 +239,7 @@ def test_team_switch_buttons_emit_a_validated_team_command(tmp_path: Path) -> No
                 page.goto(f"http://127.0.0.1:{stream.port}/tactical", wait_until="domcontentloaded")
                 team_badge = page.locator("#teamPill")
                 team_badge.wait_for(state="visible")
-                assert team_badge.text_content() == "MY TEAM · RED"
+                assert team_badge.text_content() == "我方 · 红方"
 
                 page.locator("#viewSideBlue").click()
                 deadline = time.monotonic() + 2.0
@@ -284,7 +342,7 @@ def test_tactical_state_exposes_match_clock_bounds() -> None:
 
     state = tactical_state_from_status(metadata)
 
-    assert state["match"] == {"time_left": 365, "duration_sec": 420, "running": True}
+    assert state["match"] == {"time_left": 365, "duration_sec": 420, "running": True, "started": False}
 
 
 def test_tactical_html_exposes_match_clock_controls() -> None:
@@ -394,6 +452,15 @@ def test_tactical_routes_use_shared_status_and_reject_manual_ros_mutation(tmp_pa
         status, body = get_text(stream, "/tactical")
         assert status == 200
         assert "Sentinel Flight Deck" in body
+        assert "哨兵战术台" in body
+        assert "MutationObserver" in body
+        assert "inspectorEditState" in body
+        assert "if(selection.kind==='overview'&&state.scene.selected_entity_id)" not in body
+        assert ".area,.structure,.piece{position:absolute;transform:translate(-50%,-50%)}" not in body
+        assert ".piece{position:absolute}" in body
+        assert "inspectorNeedsRender" in body
+        assert "if(forceInspector||!inspectorInitialized||inspectorNeedsRender)" in body
+        assert "setInterval(refresh,1000)" in body
         assert "pointerdown" in body
         assert "aria-live" in body
         assert 'id="tactical"' in body
@@ -508,16 +575,16 @@ def test_tactical_browser_interactions_emit_scene_commands_when_playwright_avail
                     page.set_default_timeout(5000)
                     page.goto(url, wait_until="domcontentloaded", timeout=5000)
                     page.wait_for_selector("#fieldBoard", timeout=5000)
+                    page.locator('[data-surface="units"]').click()
                     page.wait_for_function(
-                        "document.querySelectorAll('#palette button').length === 1 && "
+                        "document.querySelectorAll('#surfacePalette button').length === 1 && "
                         "document.querySelectorAll('.piece').length === 1",
                         timeout=5000,
                     )
 
                     page.wait_for_selector(".structure.base", timeout=5000)
 
-                    page.locator("#rosterInspector summary").click()
-                    page.locator("#palette button").click()
+                    page.locator("#surfacePalette button").click()
                     map_box = page.locator("#mapCanvas").bounding_box()
                     assert map_box is not None
                     page.mouse.click(map_box["x"] + map_box["width"] * 0.40, map_box["y"] + map_box["height"] * 0.55)
@@ -545,14 +612,12 @@ def test_tactical_browser_interactions_emit_scene_commands_when_playwright_avail
                     page.mouse.up()
 
                     page.locator(".structure.base").click()
-                    health_summary = page.locator("#inspectorCards details").nth(1).locator("summary").bounding_box()
-                    assert health_summary is not None
-                    page.mouse.click(health_summary["x"] + 20, health_summary["y"] + 20)
+                    health = page.locator("#inspectorCards details").nth(2)
+                    ensure_open(health)
                     health_step = page.get_by_role("button", name="+500")
                     health_step.wait_for(state="visible")
-                    # The tactical page polls state every 500 ms and intentionally redraws inspector content.
-                    # Assert its command contract without making Playwright wait through a cosmetic hover/repaint.
                     health_step.click(force=True)
+                    page.locator("[data-apply='structure']").click()
 
                     deadline = time.monotonic() + 2.0
                     while time.monotonic() < deadline:
@@ -612,7 +677,7 @@ def test_inspector_stays_open_across_selection_until_explicitly_closed(tmp_path:
                 page.wait_for_selector(".structure.base")
 
                 page.locator(".structure.base").click()
-                page.wait_for_function("document.getElementById('inspectorTitle')?.textContent.includes('Friend Base')")
+                page.wait_for_selector("#inspectorCards details")
                 assert page.locator("#inspector").is_visible()
                 handle = page.locator("#inspectorDockHandle").bounding_box()
                 assert handle is not None
@@ -627,14 +692,118 @@ def test_inspector_stays_open_across_selection_until_explicitly_closed(tmp_path:
                 piece_box = page.locator(".piece").bounding_box()
                 assert piece_box is not None
                 page.mouse.click(piece_box["x"] + piece_box["width"] / 2, piece_box["y"] + piece_box["height"] / 2)
-                page.wait_for_function("document.getElementById('inspectorTitle')?.textContent.includes('Hero')")
+                page.wait_for_selector("#hpValue")
                 assert page.locator("#inspector").is_visible()
 
                 page.locator("#inspectorClose").click()
                 page.wait_for_function("document.getElementById('workspaceShell')?.classList.contains('inspector-collapsed')")
                 page.locator("#inspectorToggle").click()
                 page.wait_for_function("!document.getElementById('workspaceShell')?.classList.contains('inspector-collapsed')")
-                assert page.locator("#inspectorTitle").text_content() == "Hero"
+                assert page.locator("#hpValue").is_visible()
+            finally:
+                browser.close()
+    finally:
+        stream.stop()
+
+
+def test_target_markers_hide_after_match_start(tmp_path: Path) -> None:
+    factory, reason = find_sync_playwright()
+    if factory is None:
+        pytest.skip(f"Playwright unavailable: {reason}")
+
+    markers = [
+        {
+            "key": "SelfBase:red",
+            "label": "红方基地",
+            "detail": "SelfBase · red",
+            "field_side": "red",
+            "x": 75,
+            "y": 700,
+        },
+        {
+            "key": "SelfBase:blue",
+            "label": "蓝方基地",
+            "detail": "SelfBase · blue",
+            "field_side": "blue",
+            "x": 1125,
+            "y": 100,
+        },
+    ]
+    stream, _control_file = started_stream(tmp_path, map_objects=markers)
+    try:
+        metadata = tactical_metadata()
+        metadata["replay"]["match_started_user"] = False
+        stream.update_metadata(metadata)
+        with factory() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                page.goto(f"http://127.0.0.1:{stream.port}/tactical", wait_until="domcontentloaded")
+                page.wait_for_function("Array.from(document.querySelectorAll('#areaLayer .area')).filter(element => getComputedStyle(element).display !== 'none').length === 1")
+                assert page.locator("#areaLayer .area.red:visible").count() == 1
+                assert page.locator("#areaLayer .area.blue:visible").count() == 0
+                assert page.locator("#goalMarker:visible").count() == 0
+
+                metadata["replay"]["match_started_user"] = True
+                stream.update_metadata(metadata)
+                page.wait_for_function("Array.from(document.querySelectorAll('#areaLayer .area')).filter(element => getComputedStyle(element).display !== 'none').length === 0")
+                assert page.locator("#goalMarker:visible").count() == 1
+            finally:
+                browser.close()
+    finally:
+        stream.stop()
+
+
+def test_inspector_health_steps_edit_draft_until_apply(tmp_path: Path) -> None:
+    factory, reason = find_sync_playwright()
+    if factory is None:
+        pytest.skip(f"Playwright unavailable: {reason}")
+
+    stream, control_file = started_stream(tmp_path)
+    try:
+        stream.update_metadata(tactical_metadata())
+        with factory() as playwright:
+            browser = playwright.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": 1440, "height": 900})
+                page.goto(f"http://127.0.0.1:{stream.port}/tactical", wait_until="domcontentloaded")
+                piece = page.locator(".piece[data-entity-id='enemy:hero:a']")
+                piece.wait_for(state="visible")
+                piece.evaluate("element => element.click()")
+                page.wait_for_selector("#hpValue")
+
+                cards = page.locator("#inspectorCards details")
+                assert cards.nth(1).evaluate("element => element.open") is True
+                assert cards.nth(2).evaluate("element => element.open") is True
+                assert cards.nth(3).evaluate("element => element.open") is False
+
+                draft = page.locator("#hpValue")
+                draft.fill("120")
+                assert not control_file.exists()
+
+                page.locator("[data-hp-step='50']").click()
+                assert draft.input_value() == "170"
+                assert not control_file.exists()
+
+                page.locator("[data-hp-step='-50']").click()
+                assert draft.input_value() == "120"
+                page.locator("[data-hp-step='-50']").click()
+                assert draft.input_value() == "70"
+                assert not control_file.exists()
+
+                page.locator("[data-apply='unit']").click()
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline and not control_file.exists():
+                    page.wait_for_timeout(25)
+                command = json.loads(control_file.read_text(encoding="utf-8").splitlines()[-1])
+                assert command["command"] == "set_unit_hp"
+                assert command["entity_id"] == "enemy:hero:a"
+                assert command["hp"] == 70
+
+                # Toggling the draft card must not expand the decision card.
+                cards.nth(1).locator("summary").click()
+                assert cards.nth(1).evaluate("element => element.open") is False
+                assert cards.nth(3).evaluate("element => element.open") is False
             finally:
                 browser.close()
     finally:
@@ -657,12 +826,10 @@ def test_inspector_health_card_and_editor_survive_live_refresh(tmp_path: Path) -
                 page.wait_for_selector(".structure.base")
                 page.locator(".structure.base").click()
                 health = page.locator("#inspectorCards details").nth(1)
-                summary_box = health.locator("summary").bounding_box()
-                assert summary_box is not None
-                page.mouse.click(summary_box["x"] + 20, summary_box["y"] + 20)
+                ensure_open(health)
                 page.locator("#hpValue").fill("4300")
 
-                # State is refreshed every 500 ms. A live editor must retain both its
+                # State is refreshed every 1000 ms. A live editor must retain both its
                 # expanded state and a user-entered, unapplied value across that refresh.
                 page.wait_for_timeout(1200)
                 assert health.evaluate("element => element.open")
@@ -722,11 +889,12 @@ def test_outpost_inspector_emits_live_health_command(tmp_path: Path) -> None:
                 page.goto(f"http://127.0.0.1:{stream.port}/tactical", wait_until="domcontentloaded")
                 outpost = page.locator(".structure.outpost")
                 outpost.click()
-                page.wait_for_function("document.getElementById('inspectorTitle')?.textContent.includes('Friend Outpost')")
-                health_summary = page.locator("#inspectorCards details").nth(1).locator("summary").bounding_box()
-                assert health_summary is not None
-                page.mouse.click(health_summary["x"] + 20, health_summary["y"] + 20)
-                page.locator("#inspectorCards details").nth(1).locator("button").nth(0).click()
+                page.wait_for_selector("#hpValue")
+                health = page.locator("#inspectorCards details").nth(2)
+                ensure_open(health)
+                health.locator("[data-hp-step='-100']").click()
+                assert page.locator("#hpValue").input_value() == "1400"
+                health.locator("[data-apply='structure']").click()
 
                 deadline = time.monotonic() + 2.0
                 while time.monotonic() < deadline and not control_file.exists():

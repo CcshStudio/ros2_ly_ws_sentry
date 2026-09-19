@@ -430,6 +430,110 @@ def test_input_state_config_preserves_manual_ros_ownership() -> None:
     assert not state.apply_command("set_structure_health", {"side": "friend", "structure": "base", "hp": 3000})
 
 
+def test_input_state_config_empty_structures_disables_regional_overlay() -> None:
+    state = SimulatorInputState.from_config(
+        {"input_owner": "mock", "structures": []},
+        field=FieldGeometry(),
+    )
+
+    assert state.snapshot()["structures"] == []
+
+
+def test_input_state_reset_restores_initial_3v3_sentry_for_current_team() -> None:
+    state = SimulatorInputState.from_config(
+        {
+            "input_owner": "mock",
+            "initial_units": [
+                {
+                    "entity_id": "friend:sentry:offline",
+                    "side": "friend",
+                    "type": "Sentry",
+                    "hp": 400,
+                    "max_hp": 400,
+                    "position_cm": {"x": 75, "y": 700},
+                }
+            ],
+        },
+        field=FieldGeometry(1200, 800),
+    )
+    state.apply_command("set_team", {"team": "blue"})
+    state.apply_command(
+        "place_unit",
+        {
+            "entity_id": "friend:sentry:offline",
+            "side": "friend",
+            "unit_key": "sentry",
+            "hp": 111,
+            "x": 600,
+            "y": 400,
+        },
+    )
+
+    state.reset()
+    snapshot = state.snapshot()
+    sentry = snapshot["units"][0]
+
+    assert snapshot["team"] == "blue"
+    assert sentry["position_cm"] == {"x": 1125, "y": 100}
+    assert sentry["hp"] == 400
+
+
+def test_input_state_team_switch_mirrors_3v3_sentry() -> None:
+    state = SimulatorInputState.from_config(
+        {
+            "input_owner": "mock",
+            "initial_units": [
+                {
+                    "entity_id": "friend:sentry:offline",
+                    "side": "friend",
+                    "type": "Sentry",
+                    "hp": 400,
+                    "max_hp": 400,
+                    "position_cm": {"x": 75, "y": 700},
+                }
+            ],
+        },
+        field=FieldGeometry(1200, 800),
+    )
+
+    assert state.snapshot()["units"][0]["position_cm"] == {"x": 75, "y": 700}
+    assert state.apply_command("set_team", {"team": "blue"})
+    assert state.snapshot()["units"][0]["position_cm"] == {"x": 1125, "y": 100}
+
+
+def test_input_state_config_can_replace_palette_and_place_3v3_sentry() -> None:
+    palette = [
+        {"side": "friend", "type": "Hero", "hp": 350, "max_hp": 350},
+        {"side": "friend", "type": "Infantry1", "hp": 300, "max_hp": 300},
+        {"side": "friend", "type": "Sentry", "hp": 400, "max_hp": 400},
+        {"side": "enemy", "type": "Hero", "hp": 350, "max_hp": 350},
+        {"side": "enemy", "type": "Infantry1", "hp": 300, "max_hp": 300},
+        {"side": "enemy", "type": "Sentry", "hp": 400, "max_hp": 400},
+    ]
+    state = SimulatorInputState.from_config(
+        {
+            "input_owner": "mock",
+            "unit_palette": palette,
+            "initial_units": [
+                {
+                    "entity_id": "friend:sentry:offline",
+                    "side": "friend",
+                    "type": "Sentry",
+                    "hp": 400,
+                    "max_hp": 400,
+                    "position_cm": {"x": 245, "y": 750},
+                }
+            ],
+        },
+        field=FieldGeometry(),
+    )
+
+    snapshot = state.snapshot()
+    assert len(snapshot["palette"]) == 6
+    assert [(unit["side"], unit["type"]) for unit in snapshot["units"]] == [("friend", "Sentry")]
+    assert snapshot["units"][0]["position_cm"] == {"x": 245, "y": 750}
+
+
 def test_input_state_snapshot_exposes_json_safe_decision_context() -> None:
     state = SimulatorInputState.with_defaults(field=FieldGeometry())
 

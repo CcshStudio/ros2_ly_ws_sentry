@@ -224,9 +224,9 @@ def test_all_scenario_fixtures_validate_against_manifest() -> None:
         "chase_goal_pos": 1,
         "chase_goal_pos_raw_bridge": 1,
         "goal_id": 1,
-        "goal_pos": 19,
+        "goal_pos": 24,
         "goal_pos_raw_bridge": 1,
-        "relative_target_bridge": 1,
+        "relative_target_bridge": 2,
     }
     assert {record.decision_intent.layer for record in scenario_records} == {
         "Startup",
@@ -236,4 +236,5 @@ def test_all_scenario_fixtures_validate_against_manifest() -> None:
         "Chase",
         "OutpostTask",
         "Recovery",
+        "Tactical",
     }

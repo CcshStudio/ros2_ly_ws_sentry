@@ -8,6 +8,6 @@ behavior_tree:
         # ArmorType IDs, ordered from highest to lowest fallback priority.
         # When Enable=true, a provided list replaces the JSON list.
         TargetPriority: [1, 3, 4, 6, 2]
-        # ArmorType IDs excluded from fallback selection and external target use.
-        # An empty list explicitly clears the JSON ignore list.
-        TargetIgnore: []
+        # TargetIgnore is intentionally omitted while it is empty: ROS 2 Humble
+        # rejects an empty YAML sequence for this parameter. The JSON profile
+        # AimTargetIgnore baseline is retained.

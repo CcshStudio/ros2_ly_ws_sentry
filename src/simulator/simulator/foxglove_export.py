@@ -417,6 +417,7 @@ def record_to_decision_frame(record: TraceRecord) -> dict[str, Any]:
             "time_left": referee.time_left,
             "sentry_can_activate_energy": referee.sentry_can_activate_energy,
             "energy_activate_confirm_pulse": referee.energy_activate_confirm_pulse,
+            "event_center_gain_point_status": referee.event_center_gain_point_status,
             "team_buff_attack": referee.team_buff_attack,
             "team_buff_defence": referee.team_buff_defence,
             "team_buff_remaining_energy": referee.team_buff_remaining_energy,

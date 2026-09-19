@@ -39,6 +39,28 @@ def test_live_viewer_command_forwards_manual_ros_input_ownership(tmp_path: Path)
     assert command[command.index("--input-owner") + 1] == "manual_ros"
 
 
+def test_live_viewer_command_forwards_viewer_config(tmp_path: Path) -> None:
+    config_path = tmp_path / "league_3v3.yaml"
+    config_path.write_text("schema: ly_simulator_config_v1\n", encoding="utf-8")
+
+    command = build_live_viewer_command(
+        tmp_path / "trace.jsonl",
+        0.25,
+        "",
+        0,
+        0.0,
+        0,
+        "",
+        0,
+        "",
+        "",
+        viewer_config=str(config_path),
+    )
+
+    assert "--config" in command
+    assert command[command.index("--config") + 1] == str(config_path.resolve())
+
+
 def test_build_mock_command_forwards_decision_context_inputs(tmp_path: Path) -> None:
     scene_path = tmp_path / "scene.json"
     scene_path.write_text('{"units":[]}\n', encoding="utf-8")
@@ -62,6 +84,8 @@ def test_build_mock_command_forwards_decision_context_inputs(tmp_path: Path) -> 
             "1",
             "--mock-team-buff-remaining-energy",
             "41",
+            "--mock-event-center-gain-point-status",
+            "1",
             "--mock-event-self-small-energy-status",
             "2",
             "--mock-event-self-fortress-gain-point-status",
@@ -144,6 +168,7 @@ def test_build_mock_command_forwards_decision_context_inputs(tmp_path: Path) -> 
     assert "--team-buff-attack 2" in shell_cmd
     assert "--team-buff-defence 1" in shell_cmd
     assert "--team-buff-remaining-energy 41" in shell_cmd
+    assert "--event-center-gain-point-status 1" in shell_cmd
     assert "--event-self-small-energy-status 2" in shell_cmd
     assert "--event-self-fortress-gain-point-status 1" in shell_cmd
     assert "--event-self-base-gain-point-status true" in shell_cmd
